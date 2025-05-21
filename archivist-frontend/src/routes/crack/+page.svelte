@@ -1,5 +1,7 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index';
+    import Input from '$lib/components/ui/input/input.svelte';
+
 	let value = $state('pick a set');
 	const sets = [
 		{ value: 'DSK', label: 'Duskmourn (DSK)' },
@@ -14,19 +16,19 @@
 <h1 class="p-8 text-xl font-bold whitespace-normal">Crack-a-pack</h1>
 
 <div id="menu-bar" class="flex flex-nowrap">
-	<div id="set-selection" class="m-4">
+	<div class="m-2">
 		<Select.Root type="single" bind:value>
-			<Select.Trigger class="w-[180px]">{triggerContent}</Select.Trigger>
+			<Select.Trigger class="w-32]">{triggerContent}</Select.Trigger>
 			<Select.Content>
 				{#each sets as set}
-					<Select.Item value={set.value} label={set.label}>{set.label}</Select.Item>
+					<Select.Item value={set.value}>{set.label}</Select.Item>
 				{/each}
 			</Select.Content>
 		</Select.Root>
 	</div>
 
-	<input type="text" class="borders p-2 rounded-sm"/>
-	<button type="submit" class="borders p-4 rounded-sm bg-sky-300">Finish pack</button>
+	<Input type="text" placeholder="Start typing to find cards..." class="max-w-m m-2" />
+ 	<button type="submit" class="borders min-w-24 w-30 m-2 rounded-sm bg-sky-300 hover:bg-sky-500">Finish pack</button>
 </div>
 
 <div id="current-pack-content"></div>
