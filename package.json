@@ -1,0 +1,7 @@
+{
+    "name": "archivist",
+    "workspaces": [
+        "frontend", 
+        "archivist-backend"
+    ]
+}
