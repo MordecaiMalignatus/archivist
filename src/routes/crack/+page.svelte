@@ -1,11 +1,13 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select/index';
     import Input from '$lib/components/ui/input/input.svelte';
+	import { page } from '$app/state';
 
 	let value = $state('pick a set');
-	let sets = [];
+	let sets = page.data.sets; 
+
     const triggerContent = $derived(
-       sets.find((s) => s.value === value)?.label ?? "Select Set"
+       sets.find((s) => s.name === value)?.label ?? "Select Set"
     );
 </script>
 
@@ -17,7 +19,7 @@
 			<Select.Trigger class="w-32]">{triggerContent}</Select.Trigger>
 			<Select.Content>
 				{#each sets as set}
-					<Select.Item value={set.value}>{set.label}</Select.Item>
+					<Select.Item value={set.name}>{set.code.toUpperCase()} — {set.name}</Select.Item>
 				{/each}
 			</Select.Content>
 		</Select.Root>
