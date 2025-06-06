@@ -3,13 +3,9 @@
     import Input from '$lib/components/ui/input/input.svelte';
 
 	let value = $state('pick a set');
-	const sets = [
-		{ value: 'DSK', label: 'Duskmourn (DSK)' },
-		{ value: 'BLB', label: 'Bloomburrow (BLB)' },
-		{ value: 'TDM', label: 'Tarkir Dragonstorm (TDM)' }
-	];
+	let sets = [];
     const triggerContent = $derived(
-        sets.find((s) => s.value === value)?.label ?? "Select Set"
+       sets.find((s) => s.value === value)?.label ?? "Select Set"
     );
 </script>
 
