@@ -1,0 +1,6 @@
+{
+	"/": [],
+	"/crack": [
+		"src/routes/crack/+page.ts"
+	]
+}
