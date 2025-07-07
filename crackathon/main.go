@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	archivePath     string = "~/grimoire/mtg-archive.json"
 	scryfallApiRoot string = "https://api.scryfall.com/"
 )
 
@@ -32,6 +31,10 @@ func main() {
 			log.Fatalf("couldn't read from stdin: %v\n", err)
 		}
 		line = strings.TrimSpace(line)
+		if line == "" {
+			break
+		}
+
 		parsedLine, err := strconv.Atoi(line)
 		if err != nil {
 			log.Printf("[ERR] Could not parse '%s' into a number, skipping...\n", line)
@@ -43,9 +46,9 @@ func main() {
 			log.Printf("[ERR] Could not obtain information from Scryfall, skipping this input: %v\n", err)
 			continue
 		}
-		_ = addToArchive(card)
+		addToArchive(card)
 
-		log.Printf("Added %s to collection!\n", card.Name)
+		log.Printf("Added %s to collection!\n\n", card.Name)
 	}
 }
 
@@ -61,17 +64,26 @@ type Card struct {
 
 type Archive map[string][]Card
 
-func addToArchive(c Card) *Archive {
-	f, err := os.Open(archivePath)
+func archivePath() string {
+	userHome, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("Can't open archive at %s for reading: %v\n", archivePath, err)
+		log.Fatalf("can't obtain user home dir for some reason: %v", err)
+	}
+	path := "/grimoire/mtg-archive.json"
+
+	return userHome + path
+}
+
+func readArchive() (*Archive, error) {
+	fileContent, err := os.ReadFile(archivePath())
+	if err != nil {
+		return nil, fmt.Errorf("Can't open archive at %s for reading: %v\n", archivePath(), err)
 	}
 
-	fileContent, err := io.ReadAll(f)
-	if err != nil {
-		log.Fatalf("Can't read from archive file: %v", err)
+	if len(fileContent) == 0 {
+		// an empty archive is not going to parse as valid json.
+		return &Archive{}, nil
 	}
-	f.Close()
 
 	var a Archive
 	err = json.Unmarshal(fileContent, &a)
@@ -79,25 +91,44 @@ func addToArchive(c Card) *Archive {
 		log.Fatalf("Archive is not valid JSON: %v\n", err)
 	}
 
-	existingCards, hasSet := a[c.Set]
+	return &a, nil
+}
+
+func addToArchive(c Card) {
+	a, err := readArchive()
+	if err != nil {
+		log.Fatalf("Can't open archive: %v", err)
+	}
+	archive := *a
+
+	existingCards, hasSet := archive[c.Set]
 	if !hasSet {
-		a[c.Set] = []Card{c}
+		archive[c.Set] = []Card{c}
 	} else {
-		existingCards = append(existingCards, c)
-		a[c.Set] = existingCards
+		var found bool
+		for _, v := range existingCards {
+			if v.Name == c.Name {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			panic("TODO")
+		} else {
+			existingCards = append(existingCards, c)
+			archive[c.Set] = existingCards
+		}
 	}
 
 	futureFileContent, err := json.Marshal(a)
 	if err != nil {
 		log.Fatalf("Can't marshal archive contents, JSON encoder error: %v", err)
 	}
-	f, err = os.Create(archivePath)
+	err = os.WriteFile(archivePath(), futureFileContent, 0644)
 	if err != nil {
 		log.Fatalf("Can't open archive for writing back after editing: %v", err)
 	}
-	f.Write(futureFileContent)
-
-	return &a
 }
 
 func getCard(setCode string, cardNumber int) (Card, error) {
@@ -114,5 +145,6 @@ func getCard(setCode string, cardNumber int) (Card, error) {
 		return Card{}, fmt.Errorf("can't deserialize json: %w", err)
 	}
 
+	cardResult.Count = cardResult.Count + 1
 	return cardResult, nil
 }
