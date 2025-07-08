@@ -52,18 +52,6 @@ func main() {
 	}
 }
 
-type Card struct {
-	OracleId string `json:"oracle_id,omitempty"`
-	Uri      string `json:"uri,omitempty"`
-	Name     string `json:"name"`
-	Set      string `json:"set"`
-	SetName  string `json:"set_name,omitempty"`
-	Rarity   string `json:"rarity,omitempty"`
-	Count    int    `json:"count"`
-}
-
-type Archive map[string][]Card
-
 func archivePath() string {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
