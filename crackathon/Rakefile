@@ -1,9 +1,9 @@
 task default: :build
 
 task :build do
-  sh 'go build .'
+  sh 'cargo build'
 end
 
 task :test do
-  sh 'go test -v .'
+  sh 'cargo test'
 end

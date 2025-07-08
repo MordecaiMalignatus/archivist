@@ -145,6 +145,6 @@ func getCard(setCode string, cardNumber int) (Card, error) {
 		return Card{}, fmt.Errorf("can't deserialize json: %w", err)
 	}
 
-	cardResult.Count = cardResult.Count + 1
+	cardResult.Count = 1
 	return cardResult, nil
 }
