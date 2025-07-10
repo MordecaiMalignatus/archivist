@@ -2,6 +2,7 @@ use anyhow::Result;
 use anyhow::anyhow;
 use reqwest::{blocking, header};
 use serde::{Deserialize, Serialize};
+use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, io};
@@ -11,7 +12,7 @@ mod human_readable_formatter;
 const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
 fn main() -> Result<()> {
-    let set_code = "blb".to_string();
+    let args = Options::parse();
     let stdin = io::stdin();
     let mut headers = header::HeaderMap::new();
     headers.insert(header::ACCEPT, "application/json".parse().unwrap());
@@ -29,12 +30,28 @@ fn main() -> Result<()> {
             break;
         }
         let number = buffer.parse::<u32>()?;
-        let card = get_card(&set_code, number, &client)?;
+        let card = get_card(&args.set_code, number, &client)?;
         add_to_archive(card.clone())?;
         println!("Added {} to collection!", card.name)
     }
 
     Ok(())
+}
+
+#[derive(Parser)]
+#[command(version, about, long_about=None)]
+#[command(name = "Crack")]
+struct Options {
+    pub set_code: String,
+    #[arg(short, long)]
+    pub debug: Option<bool>,
+    #[command(subcommand)]
+    pub subcommand: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    //Export,
 }
 
 fn add_to_archive(c: Card) -> Result<()> {
