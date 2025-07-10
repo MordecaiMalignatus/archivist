@@ -2,15 +2,15 @@ use serde_json::ser::CompactFormatter;
 use serde_json::ser::Formatter;
 use std::io;
 
-pub struct HumanReadableFormatter {
+pub struct ArchiveFormatter {
     inside_archive: bool,
     inside_card: bool,
     indent: usize,
 }
 
-impl HumanReadableFormatter {
+impl ArchiveFormatter {
     pub fn new() -> Self {
-        HumanReadableFormatter {
+        ArchiveFormatter {
             inside_archive: false,
             inside_card: false,
             indent: 0,
@@ -18,7 +18,7 @@ impl HumanReadableFormatter {
     }
 }
 
-impl Formatter for HumanReadableFormatter {
+impl Formatter for ArchiveFormatter {
     fn begin_object<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,

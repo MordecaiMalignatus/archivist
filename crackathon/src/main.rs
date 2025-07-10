@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, io};
 
-mod human_readable_formatter;
+mod archive_formatter;
 
 const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
@@ -68,7 +68,7 @@ fn add_to_archive(c: Card) -> Result<()> {
     let mut file_content = Vec::new();
     let mut serializer = serde_json::Serializer::with_formatter(
         &mut file_content,
-        human_readable_formatter::HumanReadableFormatter::new(),
+        archive_formatter::ArchiveFormatter::new(),
     );
     a.serialize(&mut serializer)
         .map_err(|err| anyhow!("error when serializing archive to string: {err}"))?;
