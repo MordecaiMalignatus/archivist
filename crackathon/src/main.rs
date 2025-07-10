@@ -116,15 +116,15 @@ fn archive_path() -> PathBuf {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Card {
-    pub oracle_id: String,
-    pub uri: String,
     pub name: String,
-    pub set: String,
     pub set_name: String,
-    pub rarity: String,
+    pub oracle_id: String,
     #[serde(default)]
     pub count: u32,
     pub colors: Vec<String>,
+    pub rarity: String,
+    pub uri: String,
+    pub set: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

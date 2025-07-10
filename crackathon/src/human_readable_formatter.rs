@@ -4,7 +4,6 @@ use std::io;
 
 pub struct HumanReadableFormatter {
     inside_archive: bool,
-    inside_list: bool,
     inside_card: bool,
     indent: usize,
 }
@@ -13,7 +12,6 @@ impl HumanReadableFormatter {
     pub fn new() -> Self {
         HumanReadableFormatter {
             inside_archive: false,
-            inside_list: false,
             inside_card: false,
             indent: 0,
         }
@@ -25,14 +23,19 @@ impl Formatter for HumanReadableFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: String;
-        if !self.inside_archive {
+        let c: String = if !self.inside_archive {
+            // Start of the file
             self.inside_archive = true;
-            c = " ".repeat(self.indent) + "{\n";
-            self.indent += 2;
+            self.indent += 4;
+            "{\n".to_string()
+        } else if !self.inside_card {
+            // New card starting
+            self.inside_card = true;
+            (" ".repeat(self.indent) + "{").to_string()
         } else {
-            c = "{".to_string();
-        }
+            // Sub-object inside a card that we may not expect, but handle anyway
+            "{".to_string()
+        };
 
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
@@ -41,71 +44,57 @@ impl Formatter for HumanReadableFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: String;
-        if !self.inside_archive {
-            self.inside_archive = false;
-            c = " ".repeat(self.indent) + "}\n";
-            self.indent -= 2;
+        let c: &[u8] = if self.inside_card {
+            // End of card, since it contains no subobjects
+            self.inside_card = false;
+            b"}"
         } else {
-            c = "}\n".to_string();
-        }
-
-        writer.write(c.as_bytes()).map(|_f| Ok(()))?
-    }
-
-    fn begin_array_value<W>(&mut self, writer: &mut W, _first: bool) -> io::Result<()>
-    where
-        W: ?Sized + io::Write,
-    {
-        let c: String;
-        if !self.inside_card {
-            self.inside_card = true;
-            c = " ".repeat(self.indent).to_string();
-        } else {
-            c = String::new();
-        }
-
-        writer.write(c.as_bytes()).map(|_f| Ok(()))?
-    }
-
-    fn end_array_value<W>(&mut self, writer: &mut W) -> io::Result<()>
-    where
-        W: ?Sized + io::Write,
-    {
-        let c: String = if !self.inside_card {
-            "\n".to_string()
-        } else {
-            "".to_string()
+            //if self.inside_archive {
+            self.indent -= 4;
+            b"}\n"
         };
 
-        writer.write(c.as_bytes()).map(|_f| Ok(()))?
+        writer.write(c).map(|_f| Ok(()))?
+    }
+
+    fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        let c: &[u8] = if self.inside_card {
+            b""
+        } else if first {
+            b"\n"
+        } else {
+            b",\n"
+        };
+        writer.write(c).map(|_f| Ok(()))?
+    }
+
+    fn end_array_value<W>(&mut self, _writer: &mut W) -> io::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        //let c: &[u8] = if !self.inside_card { b",\n" } else { b"," };
+        //writer.write(c).map(|_f| Ok(()))?
+
+        Ok(())
     }
 
     fn begin_array<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        let c: String =  if !self.inside_card {
-            self.inside_list = true;
-            " ".repeat(self.indent - 2) + "[\n"
-        } else {
-            "[".to_string()
-        };
-
-        writer.write(c.as_bytes()).map(|_f| Ok(()))?
+        let c: &[u8] = b"[";
+        writer.write(c).map(|_f| Ok(()))?
     }
 
     fn end_array<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        let c: String = if self.inside_card {
-            self.inside_list = false;
-            " ".repeat(self.indent + 2) + "]"
-        } else {
-            "]\n".to_string()
-        };
-        writer.write(c.as_bytes()).map(|_f| Ok(()))?
+        let c: &[u8] = if self.inside_card { b"]" } else { b"]\n" };
+        writer.write(c).map(|_f| Ok(()))?
     }
 
     // all these below are taken from CompactFormatter and passed through.
