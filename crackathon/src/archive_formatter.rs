@@ -44,14 +44,29 @@ impl Formatter for ArchiveFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = if self.inside_card {
+        let c: String = if self.inside_card {
             // End of card, since it contains no subobjects
             self.inside_card = false;
-            b"}"
+            "}".to_string()
         } else {
             //if self.inside_archive {
             self.indent -= 4;
-            b"}\n"
+            (" ".repeat(self.indent)) + "}"
+        };
+
+        writer.write(c.as_bytes()).map(|_f| Ok(()))?
+    }
+
+    fn begin_object_key<W>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        let c: &[u8] = if self.inside_card {
+            b""
+        } else if first {
+            b"\n"
+        } else {
+            b",\n"
         };
 
         writer.write(c).map(|_f| Ok(()))?
@@ -233,5 +248,44 @@ impl Formatter for ArchiveFormatter {
         W: ?Sized + io::Write,
     {
         CompactFormatter.write_u128(writer, value)
+    }
+}
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use pretty_assertions::assert_eq;
+
+    use crate::Card;
+    use crate::serialize_with_formatter;
+
+    #[test]
+    fn test_formatter_single_list() {
+        let mut data = HashMap::new();
+        data.insert(
+            "test".to_string(),
+            vec![Card {
+                name: "test_card".to_string(),
+                set_name: "The Test Set".to_string(),
+                oracle_id: String::new(),
+                count: 1,
+                colors: vec!["W".to_string()],
+                rarity: String::new(),
+                uri: String::new(),
+                set: "TEST".to_string(),
+            }],
+        );
+
+        let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
+
+        let wanted_result = r#"{
+  "test": [
+    {"name":"test_card","set_name":"The Test Set","oracle_id":"","count":1,"colors":["W"],"rarity":"","uri":"","set":"TEST"}
+  ]
+}"#.to_string();
+
+        let s: String =
+            String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
+        assert_eq!(s, wanted_result)
     }
 }

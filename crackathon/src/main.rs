@@ -65,17 +65,22 @@ fn add_to_archive(c: Card) -> Result<()> {
         a.insert(c.set.clone(), vec![c]);
     }
 
+    let file_content = serialize_with_formatter(&mut a)?;
+    let _ = std::fs::write(archive_path(), file_content);
+
+    Ok(())
+}
+
+fn serialize_with_formatter(input: &mut HashMap<String, Vec<Card>>) -> Result<Vec<u8>> {
     let mut file_content = Vec::new();
     let mut serializer = serde_json::Serializer::with_formatter(
         &mut file_content,
         archive_formatter::ArchiveFormatter::new(),
     );
-    a.serialize(&mut serializer)
+    input.serialize(&mut serializer)
         .map_err(|err| anyhow!("error when serializing archive to string: {err}"))?;
 
-    let _ = std::fs::write(archive_path(), file_content);
-
-    Ok(())
+    Ok(file_content)
 }
 
 fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<()> {
