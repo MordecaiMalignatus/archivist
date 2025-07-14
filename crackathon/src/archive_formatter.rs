@@ -1,5 +1,6 @@
 use serde_json::ser::CompactFormatter;
 use serde_json::ser::Formatter;
+
 use std::io;
 
 pub struct ArchiveFormatter {
@@ -26,7 +27,7 @@ impl Formatter for ArchiveFormatter {
         let c: String = if !self.inside_archive {
             // Start of the file
             self.inside_archive = true;
-            self.indent += 4;
+            self.indent += 2;
             "{\n".to_string()
         } else if !self.inside_card {
             // New card starting
@@ -44,14 +45,14 @@ impl Formatter for ArchiveFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: String = if self.inside_card {
+        let c = if self.inside_card {
             // End of card, since it contains no subobjects
             self.inside_card = false;
-            "}".to_string()
+            "}"
         } else {
             //if self.inside_archive {
-            self.indent -= 4;
-            (" ".repeat(self.indent)) + "}"
+            self.indent -= 2;
+            &(" ".repeat(self.indent) + "}")
         };
 
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
@@ -61,15 +62,21 @@ impl Formatter for ArchiveFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = if self.inside_card {
-            b""
-        } else if first {
-            b"\n"
+        let c = if !self.inside_card {
+            let indent = " ".repeat(self.indent);
+            if first { indent } else { indent + "," }
         } else {
-            b",\n"
+            if first { "" } else { "," }.to_string()
         };
 
-        writer.write(c).map(|_f| Ok(()))?
+        writer.write(c.as_bytes()).map(|_f| Ok(()))?
+    }
+
+    fn begin_object_value<W>(&mut self, writer: &mut W) -> io::Result<()>
+    where
+        W: ?Sized + io::Write, {
+        let c = ": ";
+        writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
 
     fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
@@ -86,32 +93,39 @@ impl Formatter for ArchiveFormatter {
         writer.write(c).map(|_f| Ok(()))?
     }
 
-    fn end_array_value<W>(&mut self, _writer: &mut W) -> io::Result<()>
+    fn end_array_value<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        //let c: &[u8] = if !self.inside_card { b",\n" } else { b"," };
-        //writer.write(c).map(|_f| Ok(()))?
-
-        Ok(())
+        let c: &[u8] = if !self.inside_card { b"\n" } else { b"" };
+        writer.write(c).map(|_f| Ok(()))?
     }
 
     fn begin_array<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = b"[";
-        writer.write(c).map(|_f| Ok(()))?
+        if !self.inside_card {
+            self.indent += 2
+        }
+        let c = "[";
+        writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
 
     fn end_array<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = if self.inside_card { b"]" } else { b"]\n" };
-        writer.write(c).map(|_f| Ok(()))?
+        let c = if self.inside_card {
+            "]"
+        } else {
+            self.indent -= 2;
+            &(" ".repeat(self.indent) + "]\n")
+        };
+        writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
 
+    // ======================================================================
     // all these below are taken from CompactFormatter and passed through.
     fn write_null<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
@@ -280,7 +294,7 @@ mod test {
 
         let wanted_result = r#"{
   "test": [
-    {"name":"test_card","set_name":"The Test Set","oracle_id":"","count":1,"colors":["W"],"rarity":"","uri":"","set":"TEST"}
+    {"name": "test_card","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST"}
   ]
 }"#.to_string();
 
