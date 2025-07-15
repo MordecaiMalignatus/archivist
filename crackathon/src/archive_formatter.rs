@@ -46,13 +46,13 @@ impl Formatter for ArchiveFormatter {
         W: ?Sized + io::Write,
     {
         let c = if self.inside_card {
-            // End of card, since it contains no subobjects
+            // End of card, since it contains no subobjecst
             self.inside_card = false;
             "}"
         } else {
             //if self.inside_archive {
             self.indent -= 2;
-            &(" ".repeat(self.indent) + "}")
+            &("\n".to_owned() + &" ".repeat(self.indent) + "}")
         };
 
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
@@ -64,7 +64,7 @@ impl Formatter for ArchiveFormatter {
     {
         let c = if !self.inside_card {
             let indent = " ".repeat(self.indent);
-            if first { indent } else { indent + "," }
+            if first { indent } else { ",\n".to_owned() + &indent }
         } else {
             if first { "" } else { "," }.to_string()
         };
@@ -74,21 +74,40 @@ impl Formatter for ArchiveFormatter {
 
     fn begin_object_value<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
-        W: ?Sized + io::Write, {
+        W: ?Sized + io::Write,
+    {
         let c = ": ";
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
+    }
+
+    fn end_object_value<W>(&mut self, writer: &mut W) -> io::Result<()>
+    where
+        W: ?Sized + io::Write,
+    {
+        // let c: &[u8] = if self.inside_card { b"" } else { b"\n" };
+        let c = b"";
+        writer.write(c).map(|_f| Ok(()))?
     }
 
     fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = if self.inside_card {
-            b""
-        } else if first {
-            b"\n"
-        } else {
-            b",\n"
+        let c: &[u8] = match self.inside_card {
+            true => {
+                if first {
+                    b""
+                } else {
+                    b","
+                }
+            }
+            false => {
+                if first {
+                    b"\n"
+                } else {
+                    b",\n"
+                }
+            }
         };
         writer.write(c).map(|_f| Ok(()))?
     }
@@ -98,6 +117,7 @@ impl Formatter for ArchiveFormatter {
         W: ?Sized + io::Write,
     {
         let c: &[u8] = if !self.inside_card { b"\n" } else { b"" };
+
         writer.write(c).map(|_f| Ok(()))?
     }
 
@@ -120,7 +140,7 @@ impl Formatter for ArchiveFormatter {
             "]"
         } else {
             self.indent -= 2;
-            &(" ".repeat(self.indent) + "]\n")
+            &(" ".repeat(self.indent) + "]")
         };
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
@@ -295,6 +315,51 @@ mod test {
         let wanted_result = r#"{
   "test": [
     {"name": "test_card","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST"}
+  ]
+}"#.to_string();
+
+        let s: String =
+            String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
+        assert_eq!(s, wanted_result)
+    }
+
+    #[test]
+    fn test_multiple_sets() {
+        let mut data = HashMap::new();
+        data.insert(
+            "test".to_string(),
+            vec![Card {
+                name: "test_card".to_string(),
+                set_name: "The Test Set".to_string(),
+                oracle_id: String::new(),
+                count: 1,
+                colors: vec!["W".to_string()],
+                rarity: String::new(),
+                uri: String::new(),
+                set: "TEST".to_string(),
+            }],
+        );
+        data.insert(
+            "second_test".to_string(),
+            vec![Card {
+                name: "second test card".to_string(),
+                set_name: "The Second Test Set".to_string(),
+                oracle_id: String::new(),
+                count: 1,
+                colors: vec!["B".to_string()],
+                rarity: "".to_string(),
+                uri: "".to_string(),
+                set: "SECOND TEST".to_string(),
+            }],
+        );
+        let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
+
+        let wanted_result = r#"{
+  "test": [
+    {"name": "test_card","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST"}
+  ],
+  "second_test": [
+    {"name": "second test card","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST"}
   ]
 }"#.to_string();
 
