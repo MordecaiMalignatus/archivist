@@ -1,8 +1,8 @@
 use anyhow::Result;
 use anyhow::anyhow;
+use clap::{Parser, Subcommand};
 use reqwest::{blocking, header};
 use serde::{Deserialize, Serialize};
-use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, io};
@@ -21,18 +21,25 @@ fn main() -> Result<()> {
         .default_headers(headers)
         .build()?;
 
-    loop {
-        println!("Enter card number: ");
-        let mut buffer = String::new();
-        let _ = stdin.read_line(&mut buffer)?;
-        let buffer = buffer.trim();
-        if buffer.is_empty() {
-            break;
+    match args.subcommand {
+        Some(Commands::Export) => command_export()?,
+        Some(Commands::Add {set_code})  => loop {
+            println!("Enter card number: ");
+            let mut buffer = String::new();
+            let _ = stdin.read_line(&mut buffer)?;
+            let buffer = buffer.trim();
+            if buffer.is_empty() {
+                break;
+            }
+            let number = buffer.parse::<u32>()?;
+            let card = get_card(&set_code, number, &client)?;
+            // if is_foil() {
+            //     card.foil = true;
+            // }
+            add_to_archive(card.clone())?;
+            println!("Added {} to collection!", card.name)
         }
-        let number = buffer.parse::<u32>()?;
-        let card = get_card(&args.set_code, number, &client)?;
-        add_to_archive(card.clone())?;
-        println!("Added {} to collection!", card.name)
+        _ => panic!("must supply subcommand")
     }
 
     Ok(())
@@ -42,7 +49,6 @@ fn main() -> Result<()> {
 #[command(version, about, long_about=None)]
 #[command(name = "Crack")]
 struct Options {
-    pub set_code: String,
     #[arg(short, long)]
     pub debug: Option<bool>,
     #[command(subcommand)]
@@ -51,7 +57,33 @@ struct Options {
 
 #[derive(Subcommand)]
 enum Commands {
-    //Export,
+    Export,
+    Add { set_code: String },
+}
+
+/// Export converts the current collection to the common format that is accepted
+/// by Arena, Moxfield et al. This format is roughly:
+/// "$AMOUNT $CARDNAME ($SETCODE)? $NUMBER? $FOIL?"
+/// Due to the internal structure of this application, the export is going to be sorted by set.
+fn command_export() -> Result<()> {
+    let Archive(a) = read_archive()?;
+    let mut output = String::new();
+    a.into_iter().for_each(|(_set, v)| {
+        v.iter().for_each(|card| {
+            let line = format!(
+                "{} {} ({}) {} {}\n",
+                card.count,
+                card.name,
+                card.set.to_ascii_uppercase(),
+                card.collector_number,
+                if card.foil { "*F*" } else {""}
+            );
+            output.push_str(&line);
+        });
+    });
+
+    println!("{output}");
+    Ok(())
 }
 
 fn add_to_archive(c: Card) -> Result<()> {
@@ -77,7 +109,8 @@ fn serialize_with_formatter(input: &mut HashMap<String, Vec<Card>>) -> Result<Ve
         &mut file_content,
         archive_formatter::ArchiveFormatter::new(),
     );
-    input.serialize(&mut serializer)
+    input
+        .serialize(&mut serializer)
         .map_err(|err| anyhow!("error when serializing archive to string: {err}"))?;
 
     Ok(file_content)
@@ -107,6 +140,7 @@ fn get_card(set: &str, number: u32, client: &reqwest::blocking::Client) -> Resul
     }
     let mut card = res.json::<Card>()?;
     card.count = 1;
+    card.foil = false;
     Ok(card)
 }
 
@@ -139,6 +173,7 @@ fn archive_path() -> PathBuf {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Card {
     pub name: String,
+    pub collector_number: String,
     pub set_name: String,
     pub oracle_id: String,
     #[serde(default)]
@@ -147,6 +182,7 @@ struct Card {
     pub rarity: String,
     pub uri: String,
     pub set: String,
+    pub foil: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

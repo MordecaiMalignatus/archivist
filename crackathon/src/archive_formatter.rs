@@ -307,6 +307,8 @@ mod test {
                 rarity: String::new(),
                 uri: String::new(),
                 set: "TEST".to_string(),
+                collector_number: "40".to_string(),
+                foil: false,
             }],
         );
 
@@ -314,7 +316,7 @@ mod test {
 
         let wanted_result = r#"{
   "test": [
-    {"name": "test_card","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST"}
+    {"name": "test_card","collector_number": "40","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
   ]
 }"#.to_string();
 
@@ -337,6 +339,8 @@ mod test {
                 rarity: String::new(),
                 uri: String::new(),
                 set: "TEST".to_string(),
+                collector_number: "41".to_string(),
+                foil: false
             }],
         );
         data.insert(
@@ -350,16 +354,18 @@ mod test {
                 rarity: "".to_string(),
                 uri: "".to_string(),
                 set: "SECOND TEST".to_string(),
+                collector_number: "42".to_string(),
+                foil: false
             }],
         );
         let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
 
         let wanted_result = r#"{
   "test": [
-    {"name": "test_card","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST"}
+    {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
   ],
   "second_test": [
-    {"name": "second test card","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST"}
+    {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
   ]
 }"#.to_string();
 
