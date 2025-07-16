@@ -64,7 +64,11 @@ impl Formatter for ArchiveFormatter {
     {
         let c = if !self.inside_card {
             let indent = " ".repeat(self.indent);
-            if first { indent } else { ",\n".to_owned() + &indent }
+            if first {
+                indent
+            } else {
+                ",\n".to_owned() + &indent
+            }
         } else {
             if first { "" } else { "," }.to_string()
         };
@@ -116,8 +120,8 @@ impl Formatter for ArchiveFormatter {
     where
         W: ?Sized + io::Write,
     {
-        let c: &[u8] = if !self.inside_card { b"\n" } else { b"" };
-
+        //let c: &[u8] = if !self.inside_card { b"\n" } else { b"" };
+        let c = b"";
         writer.write(c).map(|_f| Ok(()))?
     }
 
@@ -140,7 +144,7 @@ impl Formatter for ArchiveFormatter {
             "]"
         } else {
             self.indent -= 2;
-            &(" ".repeat(self.indent) + "]")
+            &("\n".to_owned() + &" ".repeat(self.indent) + "]")
         };
         writer.write(c.as_bytes()).map(|_f| Ok(()))?
     }
@@ -340,7 +344,7 @@ mod test {
                 uri: String::new(),
                 set: "TEST".to_string(),
                 collector_number: "41".to_string(),
-                foil: false
+                foil: false,
             }],
         );
         data.insert(
@@ -355,7 +359,7 @@ mod test {
                 uri: "".to_string(),
                 set: "SECOND TEST".to_string(),
                 collector_number: "42".to_string(),
-                foil: false
+                foil: false,
             }],
         );
         let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
@@ -366,6 +370,52 @@ mod test {
   ],
   "second_test": [
     {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
+  ]
+}"#.to_string();
+
+        let s: String =
+            String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
+        assert_eq!(s, wanted_result)
+    }
+
+    #[test]
+    fn test_multiple_entries_in_one_set() {
+        let mut data = HashMap::new();
+        data.insert(
+            "test".to_string(),
+            vec![
+                Card {
+                    name: "test_card".to_string(),
+                    set_name: "The Test Set".to_string(),
+                    oracle_id: String::new(),
+                    count: 1,
+                    colors: vec!["W".to_string()],
+                    rarity: String::new(),
+                    uri: String::new(),
+                    set: "TEST".to_string(),
+                    collector_number: "41".to_string(),
+                    foil: false,
+                },
+                Card {
+                    name: "second test card".to_string(),
+                    set_name: "The Test Set".to_string(),
+                    oracle_id: String::new(),
+                    count: 1,
+                    colors: vec!["B".to_string()],
+                    rarity: "".to_string(),
+                    uri: "".to_string(),
+                    set: "TEST".to_string(),
+                    collector_number: "42".to_string(),
+                    foil: false,
+                },
+            ],
+        );
+        let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
+
+        let wanted_result = r#"{
+  "test": [
+    {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false},
+    {"name": "second test card","collector_number": "42","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "TEST","foil": false}
   ]
 }"#.to_string();
 
