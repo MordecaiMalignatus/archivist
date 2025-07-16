@@ -23,23 +23,32 @@ fn main() -> Result<()> {
 
     match args.subcommand {
         Some(Commands::Export) => command_export()?,
-        Some(Commands::Add {set_code})  => loop {
-            println!("Enter card number: ");
-            let mut buffer = String::new();
-            let _ = stdin.read_line(&mut buffer)?;
-            let buffer = buffer.trim();
-            if buffer.is_empty() {
-                break;
+        Some(Commands::Add { set_code }) => {
+            loop {
+                println!("Enter card number: ");
+                let mut buffer = String::new();
+                let _ = stdin.read_line(&mut buffer)?;
+                let mut buffer = buffer.trim();
+                let mut foil: bool = false;
+
+                if buffer.is_empty() {
+                    break;
+                }
+                if buffer.ends_with("f") {
+                    foil = true;
+                    buffer = buffer.strip_suffix("f").expect("input buffer should end with `f` if previously confirmed to end with `f`. ");
+                }
+
+                let number = buffer.parse::<u32>()?;
+                let mut card = get_card(&set_code, number, &client)?;
+                if foil {
+                    card.foil = true;
+                }
+                add_to_archive(card.clone())?;
+                println!("Added {} to collection!", card.name)
             }
-            let number = buffer.parse::<u32>()?;
-            let card = get_card(&set_code, number, &client)?;
-            // if is_foil() {
-            //     card.foil = true;
-            // }
-            add_to_archive(card.clone())?;
-            println!("Added {} to collection!", card.name)
         }
-        _ => panic!("must supply subcommand")
+        _ => panic!("must supply subcommand"),
     }
 
     Ok(())
@@ -76,7 +85,7 @@ fn command_export() -> Result<()> {
                 card.name,
                 card.set.to_ascii_uppercase(),
                 card.collector_number,
-                if card.foil { "*F*" } else {""}
+                if card.foil { "*F*" } else { "" }
             );
             output.push_str(&line);
         });
