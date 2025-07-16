@@ -22,32 +22,30 @@ fn main() -> Result<()> {
         .build()?;
 
     match args.subcommand {
-        Some(Commands::Export) => command_export()?,
-        Some(Commands::Add { set_code }) => {
-            loop {
-                println!("Enter card number: ");
-                let mut buffer = String::new();
-                let _ = stdin.read_line(&mut buffer)?;
-                let mut buffer = buffer.trim();
-                let mut foil: bool = false;
+        Some(Commands::Export { output, input }) => command_export(input, output)?,
+        Some(Commands::Add { set_code, output }) => loop {
+            println!("Enter card number: ");
+            let mut buffer = String::new();
+            let _ = stdin.read_line(&mut buffer)?;
+            let buffer = buffer.trim().to_string();
 
-                if buffer.is_empty() {
-                    break;
-                }
-                if buffer.ends_with("f") {
-                    foil = true;
-                    buffer = buffer.strip_suffix("f").expect("input buffer should end with `f` if previously confirmed to end with `f`. ");
-                }
-
-                let number = buffer.parse::<u32>()?;
-                let mut card = get_card(&set_code, number, &client)?;
-                if foil {
-                    card.foil = true;
-                }
-                add_to_archive(card.clone())?;
-                println!("Added {} to collection!", card.name)
+            if buffer.is_empty() {
+                break;
             }
-        }
+            let parsed_input = match parse_addition_input(buffer, set_code.clone()) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    eprintln!("{e}");
+                    continue
+                },
+            };
+
+            let mut card = get_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
+            card.foil = parsed_input.foil;
+
+            add_to_archive(card.clone(), output.clone())?;
+            println!("Added {} to collection!\n", card.name)
+        },
         _ => panic!("must supply subcommand"),
     }
 
@@ -66,16 +64,25 @@ struct Options {
 
 #[derive(Subcommand)]
 enum Commands {
-    Export,
-    Add { set_code: String },
+    Export {
+        #[arg(short, long, value_name = "OUTPUT_FILE")]
+        output: Option<PathBuf>,
+        #[arg(short, long, value_name = "INPUT_FILE")]
+        input: Option<PathBuf>,
+    },
+    Add {
+        set_code: Option<String>,
+        #[arg(short, long, value_name = "OUTPUT_FILE")]
+        output: Option<PathBuf>,
+    },
 }
 
 /// Export converts the current collection to the common format that is accepted
 /// by Arena, Moxfield et al. This format is roughly:
 /// "$AMOUNT $CARDNAME ($SETCODE)? $NUMBER? $FOIL?"
 /// Due to the internal structure of this application, the export is going to be sorted by set.
-fn command_export() -> Result<()> {
-    let Archive(a) = read_archive()?;
+fn command_export(input_path: Option<PathBuf>, output_path: Option<PathBuf>) -> Result<()> {
+    let Archive(a) = read_archive(input_path)?;
     let mut output = String::new();
     a.into_iter().for_each(|(_set, v)| {
         v.iter().for_each(|card| {
@@ -91,12 +98,57 @@ fn command_export() -> Result<()> {
         });
     });
 
-    println!("{output}");
+    match output_path {
+        Some(path) => {
+            std::fs::write(path.clone(), output)?;
+            println!("Wrote output to {}", path.display())
+        }
+        None => println!("{output}"),
+    }
+
     Ok(())
 }
 
-fn add_to_archive(c: Card) -> Result<()> {
-    let Archive(mut a) = read_archive()?;
+#[derive(Default)]
+struct Input {
+    card_number: String,
+    set_code: String,
+    foil: bool,
+}
+
+fn parse_addition_input(mut input: String, provided_set_code: Option<String>) -> Result<Input> {
+    let mut res = Input::default();
+    let original_input = input.clone();
+
+    if input.ends_with("f") {
+        res.foil = true;
+        input = input
+            .strip_suffix("f")
+            .expect("input buffer should end with `f` if previously confirmed to end with `f`. ")
+            .to_string();
+    }
+
+    match provided_set_code {
+        Some(set) => {
+            res.set_code = set;
+            res.card_number = input.trim().to_string();
+        }
+        None => match input.split_once(' ') {
+            Some((set, number)) => {
+                res.set_code = set.to_string();
+                res.card_number = number.to_string();
+            },
+            None => {
+                return Err(anyhow!("Could not parse input '{original_input}' into setcode and number. Expecting input like 'dsk 12' or 'blb 51f'."))
+            }
+        },
+    }
+
+    Ok(res)
+}
+
+fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
+    let Archive(mut a) = read_archive(path)?;
     if a.contains_key(&c.set) {
         let set_list = a
             .get_mut(&c.set)
@@ -137,7 +189,7 @@ fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<()> {
     Ok(())
 }
 
-fn get_card(set: &str, number: u32, client: &reqwest::blocking::Client) -> Result<Card> {
+fn get_card(set: &str, number: &str, client: &reqwest::blocking::Client) -> Result<Card> {
     let url = reqwest::Url::parse(&format!("{SCRYFALL_API_ROOT}/cards/{set}/{number}"))?;
     let req = client.get(url).build()?;
     let res = client.execute(req)?;
@@ -153,8 +205,11 @@ fn get_card(set: &str, number: u32, client: &reqwest::blocking::Client) -> Resul
     Ok(card)
 }
 
-fn read_archive() -> Result<Archive> {
-    let path = archive_path();
+fn read_archive(explicit_path: Option<PathBuf>) -> Result<Archive> {
+    let path = match explicit_path {
+        Some(path) => path,
+        None => archive_path(),
+    };
     let file = match std::fs::read_to_string(path) {
         Ok(res) => res,
         Err(e) => {
