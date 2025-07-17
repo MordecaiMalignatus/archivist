@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use reqwest::{blocking, header};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::{env, io};
 
@@ -36,8 +37,8 @@ fn main() -> Result<()> {
                 Ok(parsed) => parsed,
                 Err(e) => {
                     eprintln!("{e}");
-                    continue
-                },
+                    continue;
+                }
             };
 
             let mut card = get_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
@@ -137,9 +138,11 @@ fn parse_addition_input(mut input: String, provided_set_code: Option<String>) ->
             Some((set, number)) => {
                 res.set_code = set.to_string();
                 res.card_number = number.to_string();
-            },
+            }
             None => {
-                return Err(anyhow!("Could not parse input '{original_input}' into setcode and number. Expecting input like 'dsk 12' or 'blb 51f'."))
+                return Err(anyhow!(
+                    "Could not parse input '{original_input}' into setcode and number. Expecting input like 'dsk 12' or 'blb 51f'."
+                ));
             }
         },
     }
@@ -148,7 +151,7 @@ fn parse_addition_input(mut input: String, provided_set_code: Option<String>) ->
 }
 
 fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
-    let Archive(mut a) = read_archive(path)?;
+    let Archive(mut a) = read_archive(path.clone())?;
     if a.contains_key(&c.set) {
         let set_list = a
             .get_mut(&c.set)
@@ -159,7 +162,10 @@ fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
     }
 
     let file_content = serialize_with_formatter(&mut a)?;
-    let _ = std::fs::write(archive_path(), file_content);
+    let _ = match path {
+        Some(p) => std::fs::write(p, file_content),
+        None => std::fs::write(archive_collection_path(), file_content),
+    };
 
     Ok(())
 }
@@ -208,7 +214,7 @@ fn get_card(set: &str, number: &str, client: &reqwest::blocking::Client) -> Resu
 fn read_archive(explicit_path: Option<PathBuf>) -> Result<Archive> {
     let path = match explicit_path {
         Some(path) => path,
-        None => archive_path(),
+        None => archive_collection_path(),
     };
     let file = match std::fs::read_to_string(path) {
         Ok(res) => res,
@@ -231,7 +237,15 @@ fn read_archive(explicit_path: Option<PathBuf>) -> Result<Archive> {
 
 fn archive_path() -> PathBuf {
     let homedir = env::home_dir().expect("Can't get user home directory");
-    homedir.join("mtg-archive.json")
+    let config_folder = homedir.join("crack");
+    match fs::create_dir_all(&config_folder) {
+        Ok(_) => config_folder,
+        Err(e) => panic!("can't create folder at {}: {}", config_folder.display(), e),
+    }
+}
+
+fn archive_collection_path() -> PathBuf {
+    archive_path().join("collection.json")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
