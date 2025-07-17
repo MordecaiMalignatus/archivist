@@ -1,0 +1,59 @@
+* Crack-A-Thon
+A simple unix-y tool to manage physical collections of Magic: The Gathering
+cards, with focus on fast data entry.
+
+It stores your collection(s) as a JSON blob with some niceties. This is
+primarily used for exporting to other services, but has some nice uses for
+itself.
+
+Why build this? Mostly because Moxfield's entry is search based, which means
+that turning a stack of cardboard into a shareable deck is slow as all hell.
+
+** How to use it?
+#+begin_src bash
+$ # First, let's add some cards to the overall collection.
+$ crackathon add
+Enter card number:
+blb 42
+Added Bellowing Crier to collection!
+
+Enter card number:
+blb 189
+Added Polliwallop to collection!
+
+Enter card number: # Emtpy input quits, as does EOF (Control-D) or SIGINT (Control-C)
+
+$ # This appends to the global collection, which is stored, by default, in ~/crack/collection.json.
+$ cat ~/crack/collection.json
+{
+  "blb": [
+    {"name": "Bellowing Crier","collector_number": "42","set_name": "Bloomburrow","oracle_id": "f2f3be8a-5ea1-47c2-8104-747f4589f5e6","count": 1,"colors": ["U"],"rarity": "common","uri": "https://api.scryfall.com/cards/ca2215dd-6300-49cf-b9b2-3a840b786c31","set": "blb","foil": false},
+    {"name": "Polliwallop","collector_number": "189","set_name": "Bloomburrow","oracle_id": "efd2a4ca-1bd0-4762-a997-f099326b1746","count": 1,"colors": ["G"],"rarity": "common","uri": "https://api.scryfall.com/cards/6bc4963c-d90b-4588-bdb7-85956e42a623","set": "blb","foil": false},
+  ]
+}
+$ # The format here is optimised for line-based search, ie ripgrep and the likes. It being formatted in JSON also enables the use of `jq` for more precise filtering.
+$ # You can also specify a set, if you are porting a physical collection to digital.
+$ crackathon add blb
+Enter card number:
+67
+Added Run Away Together to collection!
+
+$ # The tool exports to Arena-like decklist mode by default, which is accepted by most tools.
+$ crackathon export # This also supports an -o flag, but stdout is the default for easy feeding into xclip/pbcopy
+1 Bellowing Crier (BLB) 42
+1 Polliwallop (BLB) 189
+1 Run Away Together (BLB) 67
+
+$ # CSV export is coming, for collection import.
+#+end_src
+
+=crackathon add= also supports changing the output via a =-o= file, which makes
+it create a second collection under the given filename. `crackathon` similarly
+supports an input file under =-i= to dump out custom decklists.
+
+** Installation
+Currently, it is very simple, but inconvenient.
+
+1. Clone the repo.
+2. =rake install= will build everything, then move the resulting executable to
+   =~/.local/bin=, from which you can move it somewhere else if you want.
