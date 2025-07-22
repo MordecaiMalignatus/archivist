@@ -329,54 +329,58 @@ mod test {
         assert_eq!(s, wanted_result)
     }
 
-    #[test]
-    fn test_multiple_sets() {
-        let mut data = HashMap::new();
-        data.insert(
-            "test".to_string(),
-            vec![Card {
-                name: "test_card".to_string(),
-                set_name: "The Test Set".to_string(),
-                oracle_id: String::new(),
-                count: 1,
-                colors: vec!["W".to_string()],
-                rarity: String::new(),
-                uri: String::new(),
-                set: "TEST".to_string(),
-                collector_number: "41".to_string(),
-                foil: false,
-            }],
-        );
-        data.insert(
-            "second_test".to_string(),
-            vec![Card {
-                name: "second test card".to_string(),
-                set_name: "The Second Test Set".to_string(),
-                oracle_id: String::new(),
-                count: 1,
-                colors: vec!["B".to_string()],
-                rarity: "".to_string(),
-                uri: "".to_string(),
-                set: "SECOND TEST".to_string(),
-                collector_number: "42".to_string(),
-                foil: false,
-            }],
-        );
-        let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
+    // This test is commented out as it fails frequetly, HashMaps do not
+    // preserve order so this test flakes about 50% of time, while remaining
+    // useful to debug formatting problems when needed.
 
-        let wanted_result = r#"{
-  "test": [
-    {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
-  ],
-  "second_test": [
-    {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
-  ]
-}"#.to_string();
+//     #[test]
+//     fn test_multiple_sets() {
+//         let mut data = HashMap::new();
+//         data.insert(
+//             "test".to_string(),
+//             vec![Card {
+//                 name: "test_card".to_string(),
+//                 set_name: "The Test Set".to_string(),
+//                 oracle_id: String::new(),
+//                 count: 1,
+//                 colors: vec!["W".to_string()],
+//                 rarity: String::new(),
+//                 uri: String::new(),
+//                 set: "TEST".to_string(),
+//                 collector_number: "41".to_string(),
+//                 foil: false,
+//             }],
+//         );
+//         data.insert(
+//             "second_test".to_string(),
+//             vec![Card {
+//                 name: "second test card".to_string(),
+//                 set_name: "The Second Test Set".to_string(),
+//                 oracle_id: String::new(),
+//                 count: 1,
+//                 colors: vec!["B".to_string()],
+//                 rarity: "".to_string(),
+//                 uri: "".to_string(),
+//                 set: "SECOND TEST".to_string(),
+//                 collector_number: "42".to_string(),
+//                 foil: false,
+//             }],
+//         );
+//         let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
 
-        let s: String =
-            String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
-        assert_eq!(s, wanted_result)
-    }
+//         let wanted_result = r#"{
+//   "test": [
+//     {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
+//   ],
+//   "second_test": [
+//     {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
+//   ]
+// }"#.to_string();
+
+//         let s: String =
+//             String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
+//         assert_eq!(s, wanted_result)
+//     }
 
     #[test]
     fn test_multiple_entries_in_one_set() {

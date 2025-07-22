@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::{env, io};
 
 mod archive_formatter;
+mod input_parser;
 
 const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
@@ -33,7 +34,7 @@ fn main() -> Result<()> {
             if buffer.is_empty() {
                 break;
             }
-            let parsed_input = match parse_addition_input(buffer, set_code.clone()) {
+            let parsed_input = match input_parser::parse_addition_input(buffer, set_code.clone()) {
                 Ok(parsed) => parsed,
                 Err(e) => {
                     eprintln!("{e}");
@@ -108,46 +109,6 @@ fn command_export(input_path: Option<PathBuf>, output_path: Option<PathBuf>) -> 
     }
 
     Ok(())
-}
-
-#[derive(Default)]
-struct Input {
-    card_number: String,
-    set_code: String,
-    foil: bool,
-}
-
-fn parse_addition_input(mut input: String, provided_set_code: Option<String>) -> Result<Input> {
-    let mut res = Input::default();
-    let original_input = input.clone();
-
-    if input.ends_with("f") {
-        res.foil = true;
-        input = input
-            .strip_suffix("f")
-            .expect("input buffer should end with `f` if previously confirmed to end with `f`. ")
-            .to_string();
-    }
-
-    match provided_set_code {
-        Some(set) => {
-            res.set_code = set;
-            res.card_number = input.trim().to_string();
-        }
-        None => match input.split_once(' ') {
-            Some((set, number)) => {
-                res.set_code = set.to_string();
-                res.card_number = number.to_string();
-            }
-            None => {
-                return Err(anyhow!(
-                    "Could not parse input '{original_input}' into setcode and number. Expecting input like 'dsk 12' or 'blb 51f'."
-                ));
-            }
-        },
-    }
-
-    Ok(res)
 }
 
 fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
