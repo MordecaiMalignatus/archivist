@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     match args.subcommand {
         Some(Commands::Export { output, input }) => command_export(input, output)?,
         Some(Commands::Add { set_code, output }) => loop {
-            println!("Enter card number: ");
+            print!("Enter card number: ");
             let mut buffer = String::new();
             let _ = stdin.read_line(&mut buffer)?;
             let buffer = buffer.trim().to_string();
@@ -45,8 +45,13 @@ fn main() -> Result<()> {
             let mut card = get_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
             card.foil = parsed_input.foil;
 
-            add_to_archive(card.clone(), output.clone())?;
-            println!("Added {} to collection!\n", card.name)
+            match add_to_archive(card.clone(), output.clone())? {
+                1 => println!("Added {} to collection!\n", card.name),
+                count => println!(
+                    "Added {} to collection! ({count} in collection)\n",
+                    card.name
+                ),
+            };
         },
         _ => panic!("must supply subcommand"),
     }
@@ -111,16 +116,20 @@ fn command_export(input_path: Option<PathBuf>, output_path: Option<PathBuf>) -> 
     Ok(())
 }
 
-fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
+/// Adds `c` to the archive specified at `path`, if not, the default collection.
+/// Returns either the amount of cards now present in the collection, or an
+/// error.
+fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<usize> {
     let Archive(mut a) = read_archive(path.clone())?;
-    if a.contains_key(&c.set) {
+    let count = if a.contains_key(&c.set) {
         let set_list = a
             .get_mut(&c.set)
             .expect("didn't find sub-list despite checking for presence prior");
         add_or_increment(c, set_list)?
     } else {
         a.insert(c.set.clone(), vec![c]);
-    }
+        1
+    };
 
     let file_content = serialize_with_formatter(&mut a)?;
     let _ = match path {
@@ -128,7 +137,7 @@ fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<()> {
         None => std::fs::write(archive_collection_path(), file_content),
     };
 
-    Ok(())
+    Ok(count)
 }
 
 fn serialize_with_formatter(input: &mut HashMap<String, Vec<Card>>) -> Result<Vec<u8>> {
@@ -144,16 +153,22 @@ fn serialize_with_formatter(input: &mut HashMap<String, Vec<Card>>) -> Result<Ve
     Ok(file_content)
 }
 
-fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<()> {
+fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
     let position = set_list
         .iter()
-        .position(|owned_card| owned_card.name == c.name);
+        .position(|owned_card| owned_card.name == c.name && owned_card.foil == c.foil);
 
-    match position {
-        Some(i) => set_list[i].count += 1,
-        None => set_list.push(c),
-    }
-    Ok(())
+    let count: usize = match position {
+        Some(i) => {
+            set_list[i].count += 1;
+            set_list[i].count as usize
+        }
+        None => {
+            set_list.push(c);
+            1
+        }
+    };
+    Ok(count)
 }
 
 fn get_card(set: &str, number: &str, client: &reqwest::blocking::Client) -> Result<Card> {
@@ -209,7 +224,7 @@ fn archive_collection_path() -> PathBuf {
     archive_path().join("collection.json")
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct Card {
     pub name: String,
     pub collector_number: String,
@@ -226,3 +241,39 @@ struct Card {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Archive(HashMap<String, Vec<Card>>);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_foil_addition() {
+        let mut set_list = Vec::<Card>::new();
+        let mut c1 = Card::default();
+        let mut c2 = Card::default();
+        c1.name = String::from("a card");
+        c2.name = String::from("a card");
+        c2.foil = true;
+
+        add_or_increment(c1, &mut set_list).unwrap();
+        assert_eq!(set_list.len(), 1);
+
+        add_or_increment(c2, &mut set_list).unwrap();
+        assert_eq!(set_list.len(), 2);
+    }
+
+    #[test]
+    fn test_duplicate_addition() {
+        let mut set_list = Vec::<Card>::new();
+        let mut c1 = Card::default();
+        let mut c2 = Card::default();
+        c1.name = String::from("a card");
+        c2.name = String::from("a card");
+
+        add_or_increment(c1, &mut set_list).unwrap();
+        assert_eq!(set_list.len(), 1);
+
+        add_or_increment(c2, &mut set_list).unwrap();
+        assert_eq!(set_list.len(), 1);
+    }
+}
