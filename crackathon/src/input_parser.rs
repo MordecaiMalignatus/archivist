@@ -1,6 +1,5 @@
 use anyhow::Result;
 use anyhow::anyhow;
-use itertools::Itertools;
 
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct Input {
@@ -10,67 +9,55 @@ pub struct Input {
     pub removal: bool,
 }
 
-pub fn parse_addition_input(mut input: String, provided_set_code: Option<String>) -> Result<Input> {
+/// Parse the input given on the REPL. This is slightly tricky as this is
+/// essentially a highly compact DSL. Previously this was a lot more freeform,
+/// but now this is accepting exactly two words of input: the form
+/// `<-><collector number><f> <setcode>`. This means that `12 dsk` is valid
+/// input, but `dsk 12` is not.
+///
+/// - `-12 dsk` removes one of those copies from the  collection.
+/// - `12f dsk` adds a foil version.
+pub fn parse_addition_input(input: String, provided_set_code: Option<String>) -> Result<Input> {
     let mut res = Input::default();
-    let original_input = input.clone();
 
-    let mut iter = input.chars().peekable();
+    let word_clone = input.clone();
+    let mut word_split = word_clone.split_ascii_whitespace();
 
-    loop {
-        match &iter.peek() {
-            Some('-') => {
-                res.removal = true;
-                iter.next();
-            }
-            Some(c) => {
-                // If a new input token starts with letters, it's a set code,
-                // but it may contain numbers.
-                if char::is_alphabetic(**c) {
-                    res.set_code = iter
-                        .peeking_take_while(|ic| !char::is_whitespace(*ic))
-                        .collect();
+    let mut number = word_split
+        .next()
+        .expect("a non-empty input line has at least one word?")
+        .to_string();
+    let set_code = word_split.next();
 
-                // if a new input starts with numbers it's a card number and may not contain letters.
-                } else if char::is_digit(**c, 10) {
-                    res.card_number = iter
-                        .peeking_take_while(|ic| {
-                            !char::is_whitespace(*ic) && char::is_digit(*ic, 10)
-                        })
-                        .collect();
-                // we skip over whitespace.
-                } else if char::is_whitespace(**c) {
-                    iter.next();
-                    continue;
-                }
-            }
-            None => break,
-        }
+    if number.starts_with('-') {
+        res.removal = true;
+        number = number.strip_prefix('-').unwrap().to_string();
     }
-    if input.ends_with("f") {
+
+    if number.ends_with('f') {
         res.foil = true;
-        input = input
-            .strip_suffix("f")
-            .expect("input buffer should end with `f` if previously confirmed to end with `f`. ")
-            .to_string();
+        number = number.strip_suffix('f').unwrap().to_string();
     }
 
-    match provided_set_code {
-        Some(set) => {
-            res.set_code = set;
-            res.card_number = input.trim().to_string();
-        }
-        None => match input.split_once(' ') {
-            Some((set, number)) => {
-                res.set_code = set.to_string();
-                res.card_number = number.to_string();
-            }
+    res.card_number = number.parse()?;
+    res.set_code = match provided_set_code {
+        Some(set) => set,
+        None => match set_code {
+            Some(set_code) => match set_code.chars().all(char::is_alphanumeric) {
+                true => set_code.to_string(),
+                false => {
+                    return Err(anyhow!(
+                        "Given set code (second word) was not alphanumeric: {set_code}"
+                    ));
+                }
+            },
             None => {
                 return Err(anyhow!(
-                    "Could not parse input '{original_input}' into setcode and number. Expecting input like 'dsk 12' or 'blb 51f'."
+                    "No setcode was specified on start-up, nor passed along in the input."
                 ));
             }
         },
-    }
+    };
 
     Ok(res)
 }
@@ -96,7 +83,7 @@ mod test {
 
     #[test]
     fn test_simple_with_set() {
-        let input = "dsk 1".to_string();
+        let input = "1 dsk".to_string();
         let expected = Input {
             card_number: "1".to_string(),
             set_code: "dsk".to_string(),
@@ -132,5 +119,11 @@ mod test {
         };
         let res = parse_addition_input(input, Some("blb".to_string())).unwrap();
         assert_eq!(res, expected)
+    }
+
+    #[test]
+    fn test_only_allow_minus_on_card_number() {
+        assert!(parse_addition_input("1 -dsk".to_string(), None).is_err());
+        assert!(parse_addition_input("1-f".to_string(), None).is_err());
     }
 }
