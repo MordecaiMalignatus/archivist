@@ -1,6 +1,6 @@
 use anyhow::Result;
 use anyhow::anyhow;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use reqwest::{blocking, header};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,7 +24,11 @@ fn main() -> Result<()> {
         .build()?;
 
     match args.subcommand {
-        Some(Commands::Export { output, input }) => command_export(input, output)?,
+        Some(Commands::Export {
+            output,
+            input,
+            format,
+        }) => command_export(input, output, format)?,
         Some(Commands::Add { set_code, output }) => loop {
             print!("Enter card number: ");
             let mut buffer = String::new();
@@ -76,6 +80,8 @@ enum Commands {
         output: Option<PathBuf>,
         #[arg(short, long, value_name = "INPUT_FILE")]
         input: Option<PathBuf>,
+        #[arg(value_enum)]
+        format: Option<ExportType>,
     },
     Add {
         set_code: Option<String>,
@@ -84,14 +90,64 @@ enum Commands {
     },
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum ExportType {
+    Deck,
+    Csv,
+}
+
 /// Export converts the current collection to the common format that is accepted
 /// by Arena, Moxfield et al. This format is roughly:
 /// "$AMOUNT $CARDNAME ($SETCODE)? $NUMBER? $FOIL?"
 /// Due to the internal structure of this application, the export is going to be sorted by set.
-fn command_export(input_path: Option<PathBuf>, output_path: Option<PathBuf>) -> Result<()> {
+fn command_export(
+    input_path: Option<PathBuf>,
+    output_path: Option<PathBuf>,
+    format: Option<ExportType>,
+) -> Result<()> {
     let Archive(a) = read_archive(input_path)?;
+    let output = match format {
+        Some(ExportType::Csv) => format_as_moxfield_csv(&a),
+        Some(ExportType::Deck) => format_as_deck_list(&a),
+        None => format_as_deck_list(&a),
+    };
+
+    match output_path {
+        Some(path) => {
+            std::fs::write(path.clone(), output)?;
+            println!("Wrote output to {}", path.display())
+        }
+        None => println!("{output}"),
+    }
+
+    Ok(())
+}
+
+/// Exports the decklist as a moxfield-compatible CSV. Documentation can be
+/// found here: https://moxfield.com/help/importing-collection
+fn format_as_moxfield_csv(archive: &HashMap<String, Vec<Card>>) -> String {
     let mut output = String::new();
-    a.into_iter().for_each(|(_set, v)| {
+    output.push_str("\"Count\",\"Name\",\"Collector Number\",\"Edition\",\"Foil\"");
+    archive.iter().for_each(|(_set, v)| {
+        v.iter().for_each(|card| {
+            let line = format!(
+                "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"",
+                card.count,
+                card.name,
+                card.collector_number,
+                card.set,
+                if card.foil { "foil" } else { "" },
+            );
+            output.push_str(&line);
+        });
+    });
+
+    output
+}
+
+fn format_as_deck_list(archive: &HashMap<String, Vec<Card>>) -> String {
+    let mut output = String::new();
+    archive.iter().for_each(|(_set, v)| {
         v.iter().for_each(|card| {
             let line = format!(
                 "{} {} ({}) {} {}\n",
@@ -105,15 +161,7 @@ fn command_export(input_path: Option<PathBuf>, output_path: Option<PathBuf>) -> 
         });
     });
 
-    match output_path {
-        Some(path) => {
-            std::fs::write(path.clone(), output)?;
-            println!("Wrote output to {}", path.display())
-        }
-        None => println!("{output}"),
-    }
-
-    Ok(())
+    output
 }
 
 /// Adds `c` to the archive specified at `path`, if not, the default collection.
