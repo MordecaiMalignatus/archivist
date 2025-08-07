@@ -5,6 +5,7 @@ use reqwest::{blocking, header};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::{env, io};
 
@@ -31,6 +32,8 @@ fn main() -> Result<()> {
         }) => command_export(input, output, format)?,
         Some(Commands::Add { set_code, output }) => loop {
             print!("Enter card number: ");
+            let _ = io::stdout().flush();
+
             let mut buffer = String::new();
             let _ = stdin.read_line(&mut buffer)?;
             let buffer = buffer.trim().to_string();
@@ -46,16 +49,33 @@ fn main() -> Result<()> {
                 }
             };
 
-            let mut card = get_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
+            let mut card = query_scryfall_for_card(
+                &parsed_input.set_code,
+                &parsed_input.card_number,
+                &client,
+            )?;
             card.foil = parsed_input.foil;
 
-            match add_to_archive(card.clone(), output.clone())? {
-                1 => println!("Added {} to collection!\n", card.name),
-                count => println!(
-                    "Added {} to collection! ({count} in collection)\n",
-                    card.name
-                ),
+            // TODO: Add removal text here.
+            let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
+            let modification_text = match parsed_input.removal {
+                true => match resulting_count {
+                    0 => format!("Removed {} from collection!\n", card.name),
+                    _ => format!(
+                        "Removed {} from collection! ({resulting_count} remaining in this collection)\n",
+                        card.name
+                    ),
+                },
+                false => match resulting_count {
+                    1 => format!("Added {} to collection!\n", card.name),
+                    c => format!(
+                        "Added {} to collection! ({c} in this collection)\n",
+                        card.name
+                    ),
+                },
             };
+
+            println!("{modification_text}")
         },
         _ => panic!("must supply subcommand"),
     }
@@ -105,7 +125,7 @@ fn command_export(
     output_path: Option<PathBuf>,
     format: Option<ExportType>,
 ) -> Result<()> {
-    let Archive(a) = read_archive(input_path)?;
+    let Archive(a) = read_collection(input_path)?;
     let output = match format {
         Some(ExportType::Csv) => format_as_moxfield_csv(&a),
         Some(ExportType::Deck) => format_as_deck_list(&a),
@@ -167,16 +187,28 @@ fn format_as_deck_list(archive: &HashMap<String, Vec<Card>>) -> String {
 /// Adds `c` to the archive specified at `path`, if not, the default collection.
 /// Returns either the amount of cards now present in the collection, or an
 /// error.
-fn add_to_archive(c: Card, path: Option<PathBuf>) -> Result<usize> {
-    let Archive(mut a) = read_archive(path.clone())?;
+fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<usize> {
+    let Archive(mut a) = read_collection(path.clone())?;
     let count = if a.contains_key(&c.set) {
         let set_list = a
             .get_mut(&c.set)
             .expect("didn't find sub-list despite checking for presence prior");
-        add_or_increment(c, set_list)?
+        match removal {
+            true => remove_or_decrement(c, set_list)?,
+            false => add_or_increment(c, set_list)?,
+        }
     } else {
-        a.insert(c.set.clone(), vec![c]);
-        1
+        match removal {
+            true => {
+                return Err(anyhow!(
+                    "Can't remove card from collection, because no copies are in the collection."
+                ));
+            }
+            false => {
+                a.insert(c.set.clone(), vec![c]);
+                1
+            }
+        }
     };
 
     let file_content = serialize_with_formatter(&mut a)?;
@@ -216,10 +248,38 @@ fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
             1
         }
     };
+    set_list.sort_by_key(|c| c.collector_number.clone());
+
     Ok(count)
 }
 
-fn get_card(set: &str, number: &str, client: &reqwest::blocking::Client) -> Result<Card> {
+fn remove_or_decrement(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
+    let position = set_list
+        .iter()
+        .position(|owned_card| owned_card.name == c.name && owned_card.foil == c.foil);
+
+    let count: usize = match position {
+        Some(i) => {
+            if set_list[i].count == 1 {
+                set_list.remove(i);
+                0
+            } else {
+                set_list[i].count -= 1;
+                set_list[i].count as usize
+            }
+        }
+        None => return Err(anyhow!("No card present in collection, can't remove it.")),
+    };
+    set_list.sort_by_key(|c| c.collector_number.clone());
+
+    Ok(count)
+}
+
+fn query_scryfall_for_card(
+    set: &str,
+    number: &str,
+    client: &reqwest::blocking::Client,
+) -> Result<Card> {
     let url = reqwest::Url::parse(&format!("{SCRYFALL_API_ROOT}/cards/{set}/{number}"))?;
     let req = client.get(url).build()?;
     let res = client.execute(req)?;
@@ -235,7 +295,7 @@ fn get_card(set: &str, number: &str, client: &reqwest::blocking::Client) -> Resu
     Ok(card)
 }
 
-fn read_archive(explicit_path: Option<PathBuf>) -> Result<Archive> {
+fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
     let path = match explicit_path {
         Some(path) => path,
         None => archive_collection_path(),
