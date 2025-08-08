@@ -72,7 +72,7 @@ fn main() -> Result<()> {
                     let price_string = match card.prices {
                         Some(prices) => match card.foil {
                             true => {
-                                format!("({}€ / ${})", prices.eur_foil, prices.usd_foil)
+                                format!("({}€ / ${})", prices.eur_foil.unwrap(), prices.usd_foil.unwrap())
                             }
                             false => format!("({}€ / ${})", prices.eur, prices.usd),
                         },

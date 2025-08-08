@@ -24,9 +24,9 @@ pub struct Card {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CardPrices {
     pub usd: String,
-    pub usd_foil: String,
+    pub usd_foil: Option<String>,
     pub eur: String,
-    pub eur_foil: String,
+    pub eur_foil: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
