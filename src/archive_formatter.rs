@@ -49,10 +49,12 @@ impl Formatter for ArchiveFormatter {
             // End of card, since it contains no subobjecst
             self.inside_card = false;
             "}"
-        } else {
-            //if self.inside_archive {
+        } else if self.inside_archive {
+            self.inside_archive = false;
             self.indent -= 2;
             &("\n".to_owned() + &" ".repeat(self.indent) + "}")
+        } else {
+            "}"
         };
 
         writer.write(c.as_bytes()).map(|_f| Ok(()))?

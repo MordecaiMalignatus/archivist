@@ -56,7 +56,6 @@ fn main() -> Result<()> {
             )?;
             card.foil = parsed_input.foil;
 
-            // TODO: Add removal text here.
             let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
             let modification_text = match parsed_input.removal {
                 true => match resulting_count {
@@ -66,13 +65,24 @@ fn main() -> Result<()> {
                         card.name
                     ),
                 },
-                false => match resulting_count {
-                    1 => format!("Added {} to collection!\n", card.name),
-                    c => format!(
-                        "Added {} to collection! ({c} in this collection)\n",
-                        card.name
-                    ),
-                },
+                false => {
+                    let price_string = match card.prices {
+                        Some(prices) => match card.foil {
+                            true => {
+                                format!("({}€ / ${})", prices.eur_foil, prices.usd_foil)
+                            }
+                            false => format!("({}€ / ${})", prices.eur, prices.usd),
+                        },
+                        None => "".to_string(),
+                    };
+                    match resulting_count {
+                        1 => format!("Added {} to collection! {}\n", card.name, price_string),
+                        c => format!(
+                            "Added {} to collection! ({c} in this collection) {price_string}\n",
+                            card.name
+                        ),
+                    }
+                }
             };
 
             println!("{modification_text}")
@@ -345,6 +355,16 @@ struct Card {
     pub uri: String,
     pub set: String,
     pub foil: bool,
+    pub prices: Option<CardPrices>,
+}
+
+/// Small embedded struct that captures the pricing information returned by Scryfall.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct CardPrices {
+    pub usd: String,
+    pub usd_foil: String,
+    pub eur: String,
+    pub eur_foil: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
