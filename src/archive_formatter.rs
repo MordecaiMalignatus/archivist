@@ -296,8 +296,8 @@ mod test {
 
     use pretty_assertions::assert_eq;
 
-    use crate::Card;
     use crate::serialize_with_formatter;
+    use crate::Card;
 
     #[test]
     fn test_formatter_single_list() {
@@ -315,6 +315,7 @@ mod test {
                 set: "TEST".to_string(),
                 collector_number: "40".to_string(),
                 foil: false,
+                prices: None,
             }],
         );
 
@@ -322,7 +323,7 @@ mod test {
 
         let wanted_result = r#"{
   "test": [
-    {"name": "test_card","collector_number": "40","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
+    {"name": "test_card","collector_number": "40","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false,"prices": null}
   ]
 }"#.to_string();
 
@@ -335,54 +336,54 @@ mod test {
     // preserve order so this test flakes about 50% of time, while remaining
     // useful to debug formatting problems when needed.
 
-//     #[test]
-//     fn test_multiple_sets() {
-//         let mut data = HashMap::new();
-//         data.insert(
-//             "test".to_string(),
-//             vec![Card {
-//                 name: "test_card".to_string(),
-//                 set_name: "The Test Set".to_string(),
-//                 oracle_id: String::new(),
-//                 count: 1,
-//                 colors: vec!["W".to_string()],
-//                 rarity: String::new(),
-//                 uri: String::new(),
-//                 set: "TEST".to_string(),
-//                 collector_number: "41".to_string(),
-//                 foil: false,
-//             }],
-//         );
-//         data.insert(
-//             "second_test".to_string(),
-//             vec![Card {
-//                 name: "second test card".to_string(),
-//                 set_name: "The Second Test Set".to_string(),
-//                 oracle_id: String::new(),
-//                 count: 1,
-//                 colors: vec!["B".to_string()],
-//                 rarity: "".to_string(),
-//                 uri: "".to_string(),
-//                 set: "SECOND TEST".to_string(),
-//                 collector_number: "42".to_string(),
-//                 foil: false,
-//             }],
-//         );
-//         let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
+    //     #[test]
+    //     fn test_multiple_sets() {
+    //         let mut data = HashMap::new();
+    //         data.insert(
+    //             "test".to_string(),
+    //             vec![Card {
+    //                 name: "test_card".to_string(),
+    //                 set_name: "The Test Set".to_string(),
+    //                 oracle_id: String::new(),
+    //                 count: 1,
+    //                 colors: vec!["W".to_string()],
+    //                 rarity: String::new(),
+    //                 uri: String::new(),
+    //                 set: "TEST".to_string(),
+    //                 collector_number: "41".to_string(),
+    //                 foil: false,
+    //             }],
+    //         );
+    //         data.insert(
+    //             "second_test".to_string(),
+    //             vec![Card {
+    //                 name: "second test card".to_string(),
+    //                 set_name: "The Second Test Set".to_string(),
+    //                 oracle_id: String::new(),
+    //                 count: 1,
+    //                 colors: vec!["B".to_string()],
+    //                 rarity: "".to_string(),
+    //                 uri: "".to_string(),
+    //                 set: "SECOND TEST".to_string(),
+    //                 collector_number: "42".to_string(),
+    //                 foil: false,
+    //             }],
+    //         );
+    //         let file_content = serialize_with_formatter(&mut data).expect("formatter should work fine");
 
-//         let wanted_result = r#"{
-//   "test": [
-//     {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
-//   ],
-//   "second_test": [
-//     {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
-//   ]
-// }"#.to_string();
+    //         let wanted_result = r#"{
+    //   "test": [
+    //     {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false}
+    //   ],
+    //   "second_test": [
+    //     {"name": "second test card","collector_number": "42","set_name": "The Second Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "SECOND TEST","foil": false}
+    //   ]
+    // }"#.to_string();
 
-//         let s: String =
-//             String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
-//         assert_eq!(s, wanted_result)
-//     }
+    //         let s: String =
+    //             String::from_utf8(file_content).expect("serde_json should produce valid UTF-8");
+    //         assert_eq!(s, wanted_resul)t
+    //     }
 
     #[test]
     fn test_multiple_entries_in_one_set() {
@@ -401,6 +402,7 @@ mod test {
                     set: "TEST".to_string(),
                     collector_number: "41".to_string(),
                     foil: false,
+                    prices: None,
                 },
                 Card {
                     name: "second test card".to_string(),
@@ -413,6 +415,7 @@ mod test {
                     set: "TEST".to_string(),
                     collector_number: "42".to_string(),
                     foil: false,
+                    prices: None,
                 },
             ],
         );
@@ -420,8 +423,8 @@ mod test {
 
         let wanted_result = r#"{
   "test": [
-    {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false},
-    {"name": "second test card","collector_number": "42","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "TEST","foil": false}
+    {"name": "test_card","collector_number": "41","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["W"],"rarity": "","uri": "","set": "TEST","foil": false,"prices": null},
+    {"name": "second test card","collector_number": "42","set_name": "The Test Set","oracle_id": "","count": 1,"colors": ["B"],"rarity": "","uri": "","set": "TEST","foil": false,"prices": null}
   ]
 }"#.to_string();
 

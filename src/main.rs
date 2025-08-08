@@ -2,7 +2,7 @@ use anyhow::Result;
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use reqwest::{blocking, header};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
@@ -11,6 +11,9 @@ use std::{env, io};
 
 mod archive_formatter;
 mod input_parser;
+mod types;
+
+use types::{Archive, Card};
 
 const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
@@ -76,7 +79,7 @@ fn main() -> Result<()> {
                         None => "".to_string(),
                     };
                     match resulting_count {
-                        1 => format!("Added {} to collection! {}\n", card.name, price_string),
+                        1 => format!("Added {} to collection! {price_string}\n", card.name),
                         c => format!(
                             "Added {} to collection! ({c} in this collection) {price_string}\n",
                             card.name
@@ -341,34 +344,6 @@ fn archive_path() -> PathBuf {
 fn archive_collection_path() -> PathBuf {
     archive_path().join("collection.json")
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct Card {
-    pub name: String,
-    pub collector_number: String,
-    pub set_name: String,
-    pub oracle_id: String,
-    #[serde(default)]
-    pub count: u32,
-    pub colors: Vec<String>,
-    pub rarity: String,
-    pub uri: String,
-    pub set: String,
-    pub foil: bool,
-    pub prices: Option<CardPrices>,
-}
-
-/// Small embedded struct that captures the pricing information returned by Scryfall.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct CardPrices {
-    pub usd: String,
-    pub usd_foil: String,
-    pub eur: String,
-    pub eur_foil: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Archive(HashMap<String, Vec<Card>>);
 
 #[cfg(test)]
 mod test {
