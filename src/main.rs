@@ -3,11 +3,12 @@ use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use reqwest::{blocking, header};
 use serde::Serialize;
+use rustyline::DefaultEditor;
+
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::env;
 use std::path::PathBuf;
-use std::{env, io};
 
 mod archive_formatter;
 mod input_parser;
@@ -19,13 +20,6 @@ const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
 fn main() -> Result<()> {
     let args = Options::parse();
-    let stdin = io::stdin();
-    let mut headers = header::HeaderMap::new();
-    headers.insert(header::ACCEPT, "application/json".parse().unwrap());
-    let client = blocking::ClientBuilder::new()
-        .user_agent("Crack-a-thon, see github.com/MordecaiMalignatus/archivist.")
-        .default_headers(headers)
-        .build()?;
 
     match args.subcommand {
         Some(Commands::Export {
@@ -33,63 +27,7 @@ fn main() -> Result<()> {
             input,
             format,
         }) => command_export(input, output, format)?,
-        Some(Commands::Add { set_code, output }) => loop {
-            print!("Enter card number: ");
-            let _ = io::stdout().flush();
-
-            let mut buffer = String::new();
-            let _ = stdin.read_line(&mut buffer)?;
-            let buffer = buffer.trim().to_string();
-
-            if buffer.is_empty() {
-                break;
-            }
-            let parsed_input = match input_parser::parse_addition_input(buffer, set_code.clone()) {
-                Ok(parsed) => parsed,
-                Err(e) => {
-                    eprintln!("{e}");
-                    continue;
-                }
-            };
-
-            let mut card = query_scryfall_for_card(
-                &parsed_input.set_code,
-                &parsed_input.card_number,
-                &client,
-            )?;
-            card.foil = parsed_input.foil;
-
-            let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
-            let modification_text = match parsed_input.removal {
-                true => match resulting_count {
-                    0 => format!("Removed {} from collection!\n", card.name),
-                    _ => format!(
-                        "Removed {} from collection! ({resulting_count} remaining in this collection)\n",
-                        card.name
-                    ),
-                },
-                false => {
-                    let price_string = match card.prices {
-                        Some(prices) => match card.foil {
-                            true => {
-                                format!("({}€ / ${})", prices.eur_foil.unwrap(), prices.usd_foil.unwrap())
-                            }
-                            false => format!("({}€ / ${})", prices.eur, prices.usd),
-                        },
-                        None => "".to_string(),
-                    };
-                    match resulting_count {
-                        1 => format!("Added {} to collection! {price_string}\n", card.name),
-                        c => format!(
-                            "Added {} to collection! ({c} in this collection) {price_string}\n",
-                            card.name
-                        ),
-                    }
-                }
-            };
-
-            println!("{modification_text}")
-        },
+        Some(Commands::Add { set_code, output }) => command_add(set_code, output)?,
         _ => panic!("must supply subcommand"),
     }
 
@@ -127,6 +65,75 @@ enum Commands {
 enum ExportType {
     Deck,
     Csv,
+}
+
+fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> {
+    let mut headers = header::HeaderMap::new();
+    headers.insert(header::ACCEPT, "application/json".parse().unwrap());
+    let client = blocking::ClientBuilder::new()
+        .user_agent("Crack-a-thon, see github.com/MordecaiMalignatus/archivist.")
+        .default_headers(headers)
+        .build()?;
+    let mut rl = DefaultEditor::new()?;
+
+    loop {
+        let buffer = rl.readline("Enter Card Number: ")?;
+        let buffer = buffer.trim().to_string();
+        rl.add_history_entry(buffer.as_str())?;
+
+        if buffer.is_empty() {
+            println!("Empty input received, exiting...");
+            break;
+        }
+        let parsed_input = match input_parser::parse_addition_input(buffer, set_code.clone()) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                eprintln!("{e}");
+                continue;
+            }
+        };
+
+        let mut card =
+            query_scryfall_for_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
+        card.foil = parsed_input.foil;
+
+        let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
+        let modification_text = match parsed_input.removal {
+            true => match resulting_count {
+                0 => format!("Removed {} from collection!\n", card.name),
+                _ => format!(
+                    "Removed {} from collection! ({resulting_count} remaining in this collection)\n",
+                    card.name
+                ),
+            },
+            false => {
+                let price_string = match card.prices {
+                    Some(prices) => match card.foil {
+                        true => {
+                            // TODO(sar): this is not always true, mis-input happens, I should care for that right.
+                            format!(
+                                "({}€ / ${})",
+                                prices.eur_foil.unwrap(),
+                                prices.usd_foil.unwrap()
+                            )
+                        }
+                        false => format!("({}€ / ${})", prices.eur, prices.usd),
+                    },
+                    None => "".to_string(),
+                };
+                match resulting_count {
+                    1 => format!("Added {} to collection! {price_string}\n", card.name),
+                    c => format!(
+                        "Added {} to collection! ({c} in this collection) {price_string}\n",
+                        card.name
+                    ),
+                }
+            }
+        };
+
+        println!("{modification_text}")
+    }
+    Ok(())
 }
 
 /// Export converts the current collection to the common format that is accepted
