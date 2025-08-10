@@ -51,7 +51,7 @@ enum Commands {
         output: Option<PathBuf>,
         #[arg(short, long, value_name = "INPUT_FILE")]
         input: Option<PathBuf>,
-        #[arg(value_enum)]
+        #[arg(short, long, value_enum)]
         format: Option<ExportType>,
     },
     Add {
@@ -167,11 +167,11 @@ fn command_export(
 /// found here: https://moxfield.com/help/importing-collection
 fn format_as_moxfield_csv(archive: &HashMap<String, Vec<Card>>) -> String {
     let mut output = String::new();
-    output.push_str("\"Count\",\"Name\",\"Collector Number\",\"Edition\",\"Foil\"");
+    output.push_str("\"Count\",\"Name\",\"Collector Number\",\"Edition\",\"Foil\"\n");
     archive.iter().for_each(|(_set, v)| {
         v.iter().for_each(|card| {
             let line = format!(
-                "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"",
+                "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
                 card.count,
                 card.name,
                 card.collector_number,
