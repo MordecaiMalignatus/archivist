@@ -40,9 +40,16 @@ pub fn parse_addition_input(input: String, provided_set_code: Option<String>) ->
     }
 
     res.card_number = number.parse()?;
-    res.set_code = match provided_set_code {
-        Some(set) => set,
-        None => match set_code {
+    res.set_code = match set_code {
+        Some(set) => match set.chars().all(char::is_alphanumeric) {
+            true => set.to_string(),
+            false => {
+                return Err(anyhow!(
+                    "Given set code (second word) was not alphanumeric: {set}"
+                ));
+            }
+        },
+        None => match provided_set_code {
             Some(set_code) => match set_code.chars().all(char::is_alphanumeric) {
                 true => set_code.to_string(),
                 false => {
@@ -65,6 +72,32 @@ pub fn parse_addition_input(input: String, provided_set_code: Option<String>) ->
 #[cfg(test)]
 mod test {
     use super::*;
+
+    // TODO(sar): how do I document this behaviour in a readme?
+    #[test]
+    fn test_set_code_override() {
+        let input = String::from("1 blb");
+        let second_input = String::from("1");
+
+        let expected = Input {
+            card_number: "1".to_string(),
+            set_code: "blb".to_string(),
+            foil: false,
+            removal: false,
+        };
+        let second_expected = Input {
+            card_number: "1".to_string(),
+            set_code: "dsk".to_string(),
+            foil: false,
+            removal: false,
+        };
+
+        let res = parse_addition_input(input, Some("dsk".to_string())).unwrap();
+        let second_res = parse_addition_input(second_input, Some("dsk".to_string())).unwrap();
+
+        assert_eq!(res, expected);
+        assert_eq!(second_res, second_expected);
+    }
 
     #[test]
     fn test_simple_input_provided_setcode() {
