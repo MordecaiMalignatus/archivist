@@ -2,12 +2,12 @@ use anyhow::Result;
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use reqwest::{blocking, header};
-use serde::Serialize;
 use rustyline::DefaultEditor;
+use serde::Serialize;
 
 use std::collections::HashMap;
-use std::fs;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 mod archive_formatter;
@@ -28,7 +28,8 @@ fn main() -> Result<()> {
             format,
         }) => command_export(input, output, format)?,
         Some(Commands::Add { set_code, output }) => command_add(set_code, output)?,
-        _ => panic!("must supply subcommand"),
+        Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
+        _ => {}
     }
 
     Ok(())
@@ -36,7 +37,8 @@ fn main() -> Result<()> {
 
 #[derive(Parser)]
 #[command(version, about, long_about=None)]
-#[command(name = "Crack")]
+#[command(arg_required_else_help = true)]
+#[command(name = "Crackathon")]
 struct Options {
     #[arg(short, long)]
     pub debug: Option<bool>,
@@ -46,19 +48,29 @@ struct Options {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Export a collection to a file to be consumed by other tools.
     Export {
+        /// Which file to write to.
         #[arg(short, long, value_name = "OUTPUT_FILE")]
         output: Option<PathBuf>,
+        /// Which file to read from.
         #[arg(short, long, value_name = "INPUT_FILE")]
         input: Option<PathBuf>,
+        /// Export as either Decklist, or CSV format.
         #[arg(short, long, value_enum)]
         format: Option<ExportType>,
     },
+    /// Add some cards to a collection.
     Add {
+        /// Set code to assume for additions.
         set_code: Option<String>,
+        /// Output file to use. Use this to maintain separate lists, for e.g.
+        /// decks.
         #[arg(short, long, value_name = "OUTPUT_FILE")]
         output: Option<PathBuf>,
     },
+    /// Dump the default collection path. Useful for scripting.
+    CollectionPath,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -341,7 +353,7 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
 
 fn archive_path() -> PathBuf {
     let homedir = env::home_dir().expect("Can't get user home directory");
-    let config_folder = homedir.join("crack");
+    let config_folder = homedir.join(".config").join("crack");
     match fs::create_dir_all(&config_folder) {
         Ok(_) => config_folder,
         Err(e) => panic!("can't create folder at {}: {}", config_folder.display(), e),
