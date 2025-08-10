@@ -13,13 +13,14 @@ that turning a stack of cardboard into a shareable deck is slow as all hell.
 #+begin_src bash
 $ # First, let's add some cards to the overall collection.
 $ crackathon add
-Enter card number:
-blb 42
-Added Bellowing Crier to collection!
+Enter card number: 42 blb
+Added Bellowing Crier to collection! (0.08€ / $0.04)
 
-Enter card number:
-blb 189
-Added Polliwallop to collection!
+Enter card number: 189 blb
+Added Polliwallop to collection! (0.07€ / $0.07)
+
+Enter card number: -189 blb # Removal works too
+Removed Polliwallop from collection!
 
 Enter card number: # Emtpy input quits, as does EOF (Control-D) or SIGINT (Control-C)
 
@@ -32,7 +33,7 @@ $ cat ~/crack/collection.json
   ]
 }
 $ # The format here is optimised for line-based search, ie ripgrep and the likes. It being formatted in JSON also enables the use of `jq` for more precise filtering.
-$ # You can also specify a set, if you are porting a physical collection to digital.
+$ # You can also specify a set, if you are e.g. cracking open a pack.
 $ crackathon add blb
 Enter card number:
 67
@@ -44,7 +45,13 @@ $ crackathon export # This also supports an -o flag, but stdout is the default f
 1 Polliwallop (BLB) 189
 1 Run Away Together (BLB) 67
 
-$ # CSV export is coming, for collection import.
+$ # There is also moxfield-compatible CSV export. This allows for easy import to Moxfield.
+$ crackathon export -i ~/my-decklist.json --format CSV -o ./moxfield_export.csv
+$ cat ./moxfield_export.csv
+"Count","Name","Collector Number","Edition","Foil"
+"1","Polliwallop","189","blb",""
+"1","Bellowing Crier","42","blb",""
+"1","Run Away Together","67","blb",""
 #+end_src
 
 =crackathon add= also supports changing the output via a =-o= file, which makes
@@ -52,8 +59,12 @@ it create a second collection under the given filename. `crackathon` similarly
 supports an input file under =-i= to dump out custom decklists.
 
 ** Installation
-Currently, it is very simple, but inconvenient.
+Currently, it is very simple, but inconvenient. You will require a current
+installation of Rust. The easiest way to acquire this is via https://rustup.rs/.
 
 1. Clone the repo.
-2. =rake install= will build everything, then move the resulting executable to
-   =~/.local/bin=, from which you can move it somewhere else if you want.
+2. =cargo build --release= will build the project, and move the result to
+   =./target/release/crackathon=. From there on, you can move it wherever.
+  1. Alternatively (requires an installation of Ruby) =rake install= will build
+     everything, then move the resulting executable to =~/.local/bin=, from
+     which you can move it somewhere else if you want.
