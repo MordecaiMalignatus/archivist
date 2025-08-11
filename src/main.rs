@@ -4,10 +4,13 @@ use clap::{Parser, Subcommand, ValueEnum};
 use reqwest::{blocking, header};
 use rustyline::DefaultEditor;
 use serde::Serialize;
+use skim::Skim;
+use skim::prelude::*;
 
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 
 mod archive_formatter;
@@ -29,6 +32,7 @@ fn main() -> Result<()> {
         }) => command_export(input, output, format)?,
         Some(Commands::Add { set_code, output }) => command_add(set_code, output)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
+        Some(Commands::Search { path }) => command_search(path)?,
         _ => {}
     }
 
@@ -71,6 +75,11 @@ enum Commands {
     },
     /// Dump the default collection path. Useful for scripting.
     CollectionPath,
+    /// Search the specified collection.
+    Search {
+        #[arg()]
+        path: Option<PathBuf>,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -145,6 +154,23 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
 
         println!("{modification_text}")
     }
+    Ok(())
+}
+
+fn command_search(_path: Option<PathBuf>) -> Result<()> {
+    let options = SkimOptionsBuilder::default()
+        .height(String::from("50%"))
+        .build()
+        .unwrap();
+    let input = "This is one card\nThis is another card\nThis is a third card".to_string();
+    let item_reader = SkimItemReader::default();
+    let items = item_reader.of_bufread(Cursor::new(input));
+    let selected_item = Skim::run_with(&options, Some(items))
+        .map(|out| out.selected_items)
+        .unwrap();
+
+    println!("{}", selected_item.first().unwrap().output());
+
     Ok(())
 }
 
