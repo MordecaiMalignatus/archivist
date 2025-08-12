@@ -1,6 +1,7 @@
 use anyhow::Result;
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
+use itertools::Itertools;
 use reqwest::{blocking, header};
 use rustyline::DefaultEditor;
 use serde::Serialize;
@@ -157,12 +158,18 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
     Ok(())
 }
 
-fn command_search(_path: Option<PathBuf>) -> Result<()> {
+fn command_search(path: Option<PathBuf>) -> Result<()> {
+    let Archive(a) = read_collection(path)?;
+    let input = a
+        .values()
+        .map(|v| v.iter().map(card_to_preview).join("\n"))
+        .join("\n");
+
     let options = SkimOptionsBuilder::default()
         .height(String::from("50%"))
         .build()
         .unwrap();
-    let input = "This is one card\nThis is another card\nThis is a third card".to_string();
+
     let item_reader = SkimItemReader::default();
     let items = item_reader.of_bufread(Cursor::new(input));
     let selected_item = Skim::run_with(&options, Some(items))
@@ -172,6 +179,15 @@ fn command_search(_path: Option<PathBuf>) -> Result<()> {
     println!("{}", selected_item.first().unwrap().output());
 
     Ok(())
+}
+
+fn card_to_preview(c: &Card) -> String {
+    format!(
+        "{count}x {name} ({set})",
+        count = c.count,
+        name = c.name,
+        set = c.set.to_uppercase()
+    )
 }
 
 /// Export converts the current collection to the common format that is accepted
