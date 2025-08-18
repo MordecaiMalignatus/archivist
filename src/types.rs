@@ -29,5 +29,5 @@ pub struct CardPrices {
     pub eur_foil: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Archive(pub HashMap<String, Vec<Card>>);

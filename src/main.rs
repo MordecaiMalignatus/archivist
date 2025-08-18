@@ -34,6 +34,9 @@ fn main() -> Result<()> {
         Some(Commands::Add { set_code, output }) => command_add(set_code, output)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
         Some(Commands::Search { path }) => command_search(path)?,
+        Some(Commands::List { subcommand }) => match subcommand {
+            ListCommands::Create { name, set_used } => command_list_create(name, set_used)?,
+        },
         _ => {}
     }
 
@@ -81,6 +84,45 @@ enum Commands {
         #[arg()]
         path: Option<PathBuf>,
     },
+    /// Manipulate decklists and collections.
+    List {
+        #[command(subcommand)]
+        subcommand: ListCommands,
+    },
+    // /// Change the crackathon configuration.
+    // Config {
+    //     #[arg(long)]
+    //     set_home: String,
+    // },
+}
+
+#[derive(Subcommand)]
+enum ListCommands {
+    /// Create a new deck list. Optionally, set as current list.
+    Create {
+        #[arg(short, long, value_name = "DECK_NAME")]
+        name: String,
+        #[arg(short, long)]
+        set_used: bool,
+    },
+    // /// Set a new list as "current". Opens a selector if not given a path.
+    // Use {
+    //     #[arg(value_name = "DECK_NAME")]
+    //     path: Option<String>,
+    // },
+    // /// Delete a decklist. Opens a selector if not given a path.
+    // Delete {
+    //     #[arg(value_name = "DECK_PATH")]
+    //     path: Option<String>,
+    // },
+    // /// Prints a decklist. Prints currently used decklist if not given a path.
+    // /// Optionally opens selector.
+    // Show {
+    //     #[arg(value_name = "DECK_PATH")]
+    //     path: Option<String>,
+    //     #[arg(short, long)]
+    //     select: bool,
+    // },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -258,11 +300,25 @@ fn format_as_deck_list(archive: &HashMap<String, Vec<Card>>) -> String {
     output
 }
 
+fn command_list_create(name: String, _set_used: bool) -> Result<()> {
+    let root = archive_path();
+    let root = root.join(format!("{name}.json"));
+    let Archive(mut empty_archive) = Archive::default();
+
+    let file_content = serialize_with_formatter(&mut empty_archive)?;
+    let _ = std::fs::write(root.clone(), file_content);
+
+    println!("Created new list at {}", root.display());
+    Ok(())
+}
+
 /// Adds `c` to the archive specified at `path`, if not, the default collection.
 /// Returns either the amount of cards now present in the collection, or an
 /// error.
 fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<usize> {
     let Archive(mut a) = read_collection(path.clone())?;
+    // TODO(sar): This does not remove sets that have had all their cards
+    // removed, so there are trailing emtpy sets when that happens.
     let count = if a.contains_key(&c.set) {
         let set_list = a
             .get_mut(&c.set)
