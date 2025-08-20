@@ -31,3 +31,11 @@ pub struct CardPrices {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Archive(pub HashMap<String, Vec<Card>>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct State {
+    /// A string naming a deck. This is not intended to be an absolute path as
+    /// the deck home can change, but rather the bits between home path and
+    /// `.json`, ie `/some/home/path/.config/crack/_statefile_.json`.
+    pub currently_used_deck: Option<String>,
+}

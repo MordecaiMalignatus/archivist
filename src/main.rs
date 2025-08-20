@@ -7,6 +7,7 @@ use rustyline::DefaultEditor;
 use serde::Serialize;
 use skim::Skim;
 use skim::prelude::*;
+use types::State;
 
 use std::collections::HashMap;
 use std::env;
@@ -36,6 +37,7 @@ fn main() -> Result<()> {
         Some(Commands::Search { path }) => command_search(path)?,
         Some(Commands::List { subcommand }) => match subcommand {
             ListCommands::Create { name, set_used } => command_list_create(name, set_used)?,
+            ListCommands::Use { path, unset } => command_list_use(path, unset)?,
         },
         _ => {}
     }
@@ -105,11 +107,13 @@ enum ListCommands {
         #[arg(short, long)]
         set_used: bool,
     },
-    // /// Set a new list as "current". Opens a selector if not given a path.
-    // Use {
-    //     #[arg(value_name = "DECK_NAME")]
-    //     path: Option<String>,
-    // },
+    /// Set a new list as "current". Opens a selector if not given a path.
+    Use {
+        #[arg(value_name = "DECK_NAME")]
+        path: Option<String>,
+        #[arg(long)]
+        unset: Option<bool>,
+    },
     // /// Delete a decklist. Opens a selector if not given a path.
     // Delete {
     //     #[arg(value_name = "DECK_PATH")]
@@ -312,9 +316,41 @@ fn command_list_create(name: String, _set_used: bool) -> Result<()> {
     Ok(())
 }
 
-/// Adds `c` to the archive specified at `path`, if not, the default collection.
-/// Returns either the amount of cards now present in the collection, or an
-/// error.
+fn command_list_use(name: Option<String>, unset: Option<bool>) -> Result<()> {
+    let mut state = read_state()?;
+
+    match name {
+        Some(specified_name) => {
+            // TODO(sar): Check for ENOENT here
+            let old_deck = state.currently_used_deck;
+            state.currently_used_deck = Some(specified_name.clone());
+            match old_deck {
+                Some(old_deck) => println!("Changed used deck from {old_deck} to {specified_name}"),
+                None => println!("Changed used deck from the collection to {specified_name}"),
+            }
+        }
+        None => match unset {
+            Some(_unset_value) => {
+                todo!();
+            }
+            None => {
+                state.currently_used_deck = None;
+                println!("Unset current deck, defaulting back to the collection.");
+            }
+        },
+    }
+
+    // if absolute path, use that
+    // if bare string, use format!("{config_dir()}.{name}.json)`
+    // if empty/None, open `skim`
+    // if not found, offer to create
+
+    write_state(state)
+}
+
+/// Adds `c` to the archive specified at `path`, if not, the deck specified in
+/// the state, if not that, the default collection. Returns either the amount of
+/// cards now present in the collection, or an error.
 fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<usize> {
     let Archive(mut a) = read_collection(path.clone())?;
     // TODO(sar): This does not remove sets that have had all their cards
@@ -428,7 +464,7 @@ fn query_scryfall_for_card(
 fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
     let path = match explicit_path {
         Some(path) => path,
-        None => archive_collection_path(),
+        None => default_collection_path()?,
     };
     let file = match std::fs::read_to_string(path) {
         Ok(res) => res,
@@ -449,6 +485,41 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
     }
 }
 
+fn default_collection_path() -> Result<PathBuf> {
+    let state = read_state()?;
+    let res = match state.currently_used_deck {
+        Some(deck_name) => archive_path().join(format!("{deck_name}.json")),
+        None => archive_collection_path(),
+    };
+    Ok(res)
+}
+
+fn read_state() -> Result<State> {
+    let file = match std::fs::read_to_string(state_file_path()) {
+        Ok(res) => res,
+        Err(e) => {
+            match e.kind() {
+                std::io::ErrorKind::NotFound => {
+                    // If it's not found, return an empty JSON object that is going
+                    // to parse into an empty HashMap just fine.
+                    "{}".to_string()
+                }
+                _ => return Err(anyhow!("Could not read statefile: {e}")),
+            }
+        }
+    };
+    match serde_json::from_str(&file) {
+        Ok(archive) => Ok(archive),
+        Err(e) => Err(anyhow!("Archive is not valid JSON: {e}")),
+    }
+}
+
+fn write_state(s: State) -> Result<()> {
+    let file_content = serde_json::to_string_pretty(&s)?;
+    std::fs::write(state_file_path(), file_content)?;
+    Ok(())
+}
+
 fn archive_path() -> PathBuf {
     let homedir = env::home_dir().expect("Can't get user home directory");
     let config_folder = homedir.join(".config").join("crack");
@@ -460,6 +531,10 @@ fn archive_path() -> PathBuf {
 
 fn archive_collection_path() -> PathBuf {
     archive_path().join("collection.json")
+}
+
+fn state_file_path() -> PathBuf {
+    archive_path().join("_state.json")
 }
 
 #[cfg(test)]
