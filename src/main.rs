@@ -17,11 +17,10 @@ use std::path::PathBuf;
 
 mod archive_formatter;
 mod input_parser;
+mod scryfall;
 mod types;
 
 use types::{Archive, Card};
-
-const SCRYFALL_API_ROOT: &str = "https://api.scryfall.com/";
 
 fn main() -> Result<()> {
     let args = Options::parse();
@@ -162,7 +161,7 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
         };
 
         let mut card =
-            query_scryfall_for_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
+            scryfall::query_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
         card.foil = parsed_input.foil;
 
         let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
@@ -439,26 +438,6 @@ fn remove_or_decrement(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
     set_list.sort_by_key(|c| c.collector_number.clone());
 
     Ok(count)
-}
-
-fn query_scryfall_for_card(
-    set: &str,
-    number: &str,
-    client: &reqwest::blocking::Client,
-) -> Result<Card> {
-    let url = reqwest::Url::parse(&format!("{SCRYFALL_API_ROOT}/cards/{set}/{number}"))?;
-    let req = client.get(url).build()?;
-    let res = client.execute(req)?;
-    if res.status() != 200 {
-        return Err(anyhow!(
-            "Error from Scryfall, response: {}",
-            res.text().unwrap()
-        ));
-    }
-    let mut card = res.json::<Card>()?;
-    card.count = 1;
-    card.foil = false;
-    Ok(card)
 }
 
 fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
