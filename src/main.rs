@@ -160,8 +160,17 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
             }
         };
 
-        let mut card =
-            scryfall::query_card(&parsed_input.set_code, &parsed_input.card_number, &client)?;
+        let mut card = match scryfall::query_card(
+            &parsed_input.set_code,
+            &parsed_input.card_number,
+            &client,
+        ) {
+            Ok(card) => card,
+            Err(e) => {
+                eprintln!("Error from scryfall: {e}");
+                continue;
+            }
+        };
         card.foil = parsed_input.foil;
 
         let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
