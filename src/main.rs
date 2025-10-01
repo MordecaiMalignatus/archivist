@@ -4,7 +4,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 use itertools::Itertools;
 use reqwest::{blocking, header};
 use rustyline::DefaultEditor;
-use serde::Serialize;
 use skim::Skim;
 use skim::prelude::*;
 use types::State;
@@ -15,7 +14,6 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-mod archive_formatter;
 mod input_parser;
 mod scryfall;
 mod types;
@@ -317,7 +315,7 @@ fn command_list_create(name: String, _set_used: bool) -> Result<()> {
     let root = root.join(format!("{name}.json"));
     let Archive(mut empty_archive) = Archive::default();
 
-    let file_content = serialize_with_formatter(&mut empty_archive)?;
+    let file_content = serde_json::to_string_pretty(&mut empty_archive)?;
     let _ = std::fs::write(root.clone(), file_content);
 
     println!("Created new list at {}", root.display());
@@ -385,26 +383,13 @@ fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<usize> 
         }
     };
 
-    let file_content = serialize_with_formatter(&mut a)?;
+    let file_content = serde_json::to_string_pretty(&mut a)?;
     let _ = match path {
         Some(p) => std::fs::write(p, file_content),
         None => std::fs::write(archive_collection_path(), file_content),
     };
 
     Ok(count)
-}
-
-fn serialize_with_formatter(input: &mut HashMap<String, Vec<Card>>) -> Result<Vec<u8>> {
-    let mut file_content = Vec::new();
-    let mut serializer = serde_json::Serializer::with_formatter(
-        &mut file_content,
-        archive_formatter::ArchiveFormatter::new(),
-    );
-    input
-        .serialize(&mut serializer)
-        .map_err(|err| anyhow!("error when serializing archive to string: {err}"))?;
-
-    Ok(file_content)
 }
 
 fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
