@@ -171,7 +171,13 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
         };
         card.foil = parsed_input.foil;
 
-        let resulting_count = edit_archive(card.clone(), output.clone(), parsed_input.removal)?;
+        let resulting_count = match edit_archive(card.clone(), output.clone(), parsed_input.removal) {
+            Ok(i) => i,
+            Err(e) => {
+                println!("{e}");
+                continue
+            }
+        };
         let modification_text = match parsed_input.removal {
             true => match resulting_count {
                 0 => format!("Removed {} from collection!\n", card.name),
