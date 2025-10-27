@@ -8,7 +8,6 @@ use skim::Skim;
 use skim::prelude::*;
 use types::State;
 
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::Cursor;
@@ -171,11 +170,12 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
         };
         card.foil = parsed_input.foil;
 
-        let resulting_count = match edit_archive(card.clone(), output.clone(), parsed_input.removal) {
+        let resulting_count = match edit_archive(card.clone(), output.clone(), parsed_input.removal)
+        {
             Ok(i) => i,
             Err(e) => {
                 println!("{e}");
-                continue
+                continue;
             }
         };
         let modification_text = match parsed_input.removal {
@@ -218,10 +218,7 @@ fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> 
 
 fn command_search(path: Option<PathBuf>) -> Result<()> {
     let Archive(a) = read_collection(path)?;
-    let input = a
-        .values()
-        .map(|v| v.iter().map(card_to_preview).join("\n"))
-        .join("\n");
+    let input = a.into_iter().map(|card| card_to_preview(&card)).join("\n");
 
     let options = SkimOptionsBuilder::default()
         .height(String::from("50%"))
@@ -277,40 +274,38 @@ fn command_export(
 
 /// Exports the decklist as a moxfield-compatible CSV. Documentation can be
 /// found here: https://moxfield.com/help/importing-collection
-fn format_as_moxfield_csv(archive: &HashMap<String, Vec<Card>>) -> String {
+fn format_as_moxfield_csv(archive: &[Card]) -> String {
     let mut output = String::new();
     output.push_str("\"Count\",\"Name\",\"Collector Number\",\"Edition\",\"Foil\"\n");
-    archive.iter().for_each(|(_set, v)| {
-        v.iter().for_each(|card| {
-            let line = format!(
-                "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
-                card.count,
-                card.name,
-                card.collector_number,
-                card.set,
-                if card.foil { "foil" } else { "" },
-            );
-            output.push_str(&line);
-        });
+
+    archive.iter().for_each(|card| {
+        let line = format!(
+            "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\"\n",
+            card.count,
+            card.name,
+            card.collector_number,
+            card.set,
+            if card.foil { "foil" } else { "" },
+        );
+        output.push_str(&line);
     });
 
     output
 }
 
-fn format_as_deck_list(archive: &HashMap<String, Vec<Card>>) -> String {
+fn format_as_deck_list(archive: &[Card]) -> String {
     let mut output = String::new();
-    archive.iter().for_each(|(_set, v)| {
-        v.iter().for_each(|card| {
-            let line = format!(
-                "{} {} ({}) {} {}\n",
-                card.count,
-                card.name,
-                card.set.to_ascii_uppercase(),
-                card.collector_number,
-                if card.foil { "*F*" } else { "" }
-            );
-            output.push_str(&line);
-        });
+
+    archive.iter().for_each(|card| {
+        let line = format!(
+            "{} {} ({}) {} {}\n",
+            card.count,
+            card.name,
+            card.set.to_ascii_uppercase(),
+            card.collector_number,
+            if card.foil { "*F*" } else { "" }
+        );
+        output.push_str(&line);
     });
 
     output
@@ -319,9 +314,9 @@ fn format_as_deck_list(archive: &HashMap<String, Vec<Card>>) -> String {
 fn command_list_create(name: String, _set_used: bool) -> Result<()> {
     let root = archive_path();
     let root = root.join(format!("{name}.json"));
-    let Archive(mut empty_archive) = Archive::default();
+    let Archive(empty_archive) = Archive::default();
 
-    let file_content = serde_json::to_string_pretty(&mut empty_archive)?;
+    let file_content = serde_json::to_string_pretty(&empty_archive)?;
     let _ = std::fs::write(root.clone(), file_content);
 
     println!("Created new list at {}", root.display());
@@ -363,79 +358,40 @@ fn command_list_use(name: Option<String>, unset: Option<bool>) -> Result<()> {
 /// Adds `c` to the archive specified at `path`, if not, the deck specified in
 /// the state, if not that, the default collection. Returns either the amount of
 /// cards now present in the collection, or an error.
-fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<usize> {
+fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<u32> {
     let Archive(mut a) = read_collection(path.clone())?;
-    // TODO(sar): This does not remove sets that have had all their cards
-    // removed, so there are trailing emtpy sets when that happens.
-    let count = if a.contains_key(&c.set) {
-        let set_list = a
-            .get_mut(&c.set)
-            .expect("didn't find sub-list despite checking for presence prior");
-        match removal {
-            true => remove_or_decrement(c, set_list)?,
-            false => add_or_increment(c, set_list)?,
+    let card_in_archive = a.iter_mut().find(|archive_card| {
+        archive_card.set == c.set
+            && archive_card.collector_number == c.collector_number
+            && archive_card.foil == c.foil
+    });
+
+    let count = match card_in_archive {
+        Some(archive_card) => {
+            if removal {
+                archive_card.count -= 1;
+                archive_card.count
+            } else {
+                archive_card.count += 1;
+                archive_card.count
+            }
         }
-    } else {
-        match removal {
-            true => {
+        None => {
+            if removal {
                 return Err(anyhow!(
                     "Can't remove card from collection, because no copies are in the collection."
                 ));
             }
-            false => {
-                a.insert(c.set.clone(), vec![c]);
-                1
-            }
+            a.push(c.clone());
+            c.count
         }
     };
 
-    let file_content = serde_json::to_string_pretty(&mut a)?;
+    let file_content = serde_json::to_string_pretty(&a)?;
     let _ = match path {
         Some(p) => std::fs::write(p, file_content),
         None => std::fs::write(archive_collection_path(), file_content),
     };
-
-    Ok(count)
-}
-
-fn add_or_increment(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
-    let position = set_list
-        .iter()
-        .position(|owned_card| owned_card.name == c.name && owned_card.foil == c.foil);
-
-    let count: usize = match position {
-        Some(i) => {
-            set_list[i].count += 1;
-            set_list[i].count as usize
-        }
-        None => {
-            set_list.push(c);
-            1
-        }
-    };
-    set_list.sort_by_key(|c| c.collector_number.clone());
-
-    Ok(count)
-}
-
-fn remove_or_decrement(c: Card, set_list: &mut Vec<Card>) -> Result<usize> {
-    let position = set_list
-        .iter()
-        .position(|owned_card| owned_card.name == c.name && owned_card.foil == c.foil);
-
-    let count: usize = match position {
-        Some(i) => {
-            if set_list[i].count == 1 {
-                set_list.remove(i);
-                0
-            } else {
-                set_list[i].count -= 1;
-                set_list[i].count as usize
-            }
-        }
-        None => return Err(anyhow!("No card present in collection, can't remove it.")),
-    };
-    set_list.sort_by_key(|c| c.collector_number.clone());
 
     Ok(count)
 }
@@ -451,8 +407,8 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
             match e.kind() {
                 std::io::ErrorKind::NotFound => {
                     // If it's not found, return an empty JSON object that is going
-                    // to parse into an empty HashMap just fine.
-                    "{}".to_string()
+                    // to parse into an empty List just fine.
+                    "[]".to_string()
                 }
                 _ => return Err(anyhow!("Could not read archive: {e}")),
             }
@@ -514,40 +470,4 @@ fn archive_collection_path() -> PathBuf {
 
 fn state_file_path() -> PathBuf {
     archive_path().join("_state.json")
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_foil_addition() {
-        let mut set_list = Vec::<Card>::new();
-        let mut c1 = Card::default();
-        let mut c2 = Card::default();
-        c1.name = String::from("a card");
-        c2.name = String::from("a card");
-        c2.foil = true;
-
-        add_or_increment(c1, &mut set_list).unwrap();
-        assert_eq!(set_list.len(), 1);
-
-        add_or_increment(c2, &mut set_list).unwrap();
-        assert_eq!(set_list.len(), 2);
-    }
-
-    #[test]
-    fn test_duplicate_addition() {
-        let mut set_list = Vec::<Card>::new();
-        let mut c1 = Card::default();
-        let mut c2 = Card::default();
-        c1.name = String::from("a card");
-        c2.name = String::from("a card");
-
-        add_or_increment(c1, &mut set_list).unwrap();
-        assert_eq!(set_list.len(), 1);
-
-        add_or_increment(c2, &mut set_list).unwrap();
-        assert_eq!(set_list.len(), 1);
-    }
 }
