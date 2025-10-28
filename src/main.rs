@@ -28,7 +28,10 @@ fn main() -> Result<()> {
             input,
             format,
         }) => command_export(input, output, format)?,
-        Some(Commands::Add { set_code, output }) => command_add(set_code, output)?,
+        Some(Commands::Add {
+            output_file,
+            set_code,
+        }) => command_add(output_file, set_code)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
         Some(Commands::Search { path }) => command_search(path)?,
         Some(Commands::List { subcommand }) => match subcommand {
@@ -68,12 +71,12 @@ enum Commands {
     },
     /// Add some cards to a collection.
     Add {
-        /// Set code to assume for additions.
+        /// Output file to use. If not specified, entered cards modify the default collection.
+        #[arg()]
+        output_file: Option<PathBuf>,
+        /// Set code to default to. Very useful when entering boosters.
+        #[arg(short, long, value_name = "SET_CODE")]
         set_code: Option<String>,
-        /// Output file to use. Use this to maintain separate lists, for e.g.
-        /// decks.
-        #[arg(short, long, value_name = "OUTPUT_FILE")]
-        output: Option<PathBuf>,
     },
     /// Dump the default collection path. Useful for scripting.
     CollectionPath,
@@ -131,7 +134,7 @@ enum ExportType {
     Csv,
 }
 
-fn command_add(set_code: Option<String>, output: Option<PathBuf>) -> Result<()> {
+fn command_add(output: Option<PathBuf>, set_code: Option<String>) -> Result<()> {
     let mut headers = header::HeaderMap::new();
     headers.insert(header::ACCEPT, "application/json".parse().unwrap());
     let client = blocking::ClientBuilder::new()
