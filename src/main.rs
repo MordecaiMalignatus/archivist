@@ -11,6 +11,7 @@ use types::State;
 use std::env;
 use std::fs;
 use std::io::Cursor;
+use std::path;
 use std::path::PathBuf;
 
 mod input_parser;
@@ -34,6 +35,7 @@ fn main() -> Result<()> {
         }) => command_add(output_file, set_code)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
         Some(Commands::Search { path }) => command_search(path)?,
+        Some(Commands::Create { name, set_used }) => command_list_create(name, set_used)?,
         Some(Commands::List { subcommand }) => match subcommand {
             ListCommands::Create { name, set_used } => command_list_create(name, set_used)?,
             ListCommands::Use { path, unset } => command_list_use(path, unset)?,
@@ -90,6 +92,15 @@ enum Commands {
         #[command(subcommand)]
         subcommand: ListCommands,
     },
+    /// Create a new deck list. Optionally, set as current list. Alias from the `list create` subcommand.
+    Create {
+        /// Deck name. Used for the filename, as well as the display name.
+        #[arg(short, long, value_name = "DECK_NAME")]
+        name: String,
+        /// Whether or not to set the decklist as the currently active default collection. Defaults to true.
+        #[arg(short, long, default_value = "true")]
+        set_used: bool,
+    },
     // /// Change the crackathon configuration.
     // Config {
     //     #[arg(long)]
@@ -101,9 +112,11 @@ enum Commands {
 enum ListCommands {
     /// Create a new deck list. Optionally, set as current list.
     Create {
+        /// Deck name. Used for the filename, as well as the display name.
         #[arg(short, long, value_name = "DECK_NAME")]
         name: String,
-        #[arg(short, long)]
+        /// Whether or not to set the decklist as the currently active default collection. Defaults to true.
+        #[arg(short, long, default_value = "true")]
         set_used: bool,
     },
     /// Set a new list as "current". Opens a selector if not given a path.
