@@ -11,7 +11,6 @@ use types::State;
 use std::env;
 use std::fs;
 use std::io::Cursor;
-use std::path;
 use std::path::PathBuf;
 
 mod input_parser;
@@ -262,9 +261,9 @@ fn card_to_preview(c: &Card) -> String {
 }
 
 /// Export converts the current collection to the common format that is accepted
-/// by Arena, Moxfield et al. This format is roughly:
-/// "$AMOUNT $CARDNAME ($SETCODE)? $NUMBER? $FOIL?"
-/// Due to the internal structure of this application, the export is going to be sorted by set.
+/// by Arena, Moxfield et al. This format is roughly: "$AMOUNT $CARDNAME
+/// ($SETCODE)? $NUMBER? $FOIL?" Due to the internal structure of this
+/// application, the export is going to be sorted by set.
 fn command_export(
     input_path: Option<PathBuf>,
     output_path: Option<PathBuf>,
@@ -386,11 +385,10 @@ fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<u32> {
         Some(archive_card) => {
             if removal {
                 archive_card.count -= 1;
-                archive_card.count
             } else {
                 archive_card.count += 1;
-                archive_card.count
             }
+            archive_card.count
         }
         None => {
             if removal {
