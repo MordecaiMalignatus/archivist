@@ -12,7 +12,7 @@ pub struct Card {
     pub oracle_id: String,
     #[serde(default)]
     pub count: u32,
-    pub colors: Vec<String>,
+    pub colors: Option<Vec<String>>,
     pub rarity: String,
     pub uri: String,
     pub set: String,
