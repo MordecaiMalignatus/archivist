@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// A Scryfall card object, reduced by quite a few fields. The API docs for the
@@ -29,6 +31,10 @@ pub struct CardPrices {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Archive(pub Vec<Card>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct OldArchive(pub HashMap<String, Vec<Card>>);
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {

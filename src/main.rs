@@ -6,6 +6,7 @@ use reqwest::{blocking, header};
 use rustyline::DefaultEditor;
 use skim::Skim;
 use skim::prelude::*;
+use types::OldArchive;
 use types::State;
 
 use std::env;
@@ -428,10 +429,28 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
             }
         }
     };
-    match serde_json::from_str(&file) {
-        Ok(archive) => Ok(archive),
-        Err(e) => Err(anyhow!("Archive is not valid JSON: {e}")),
-    }
+    let res: Result<Archive> = match serde_json::from_str(&file) {
+        Ok(res) => return Ok(res),
+        _ => {
+            let fallback_res: OldArchive = match serde_json::from_str(&file) {
+                Ok(res) => res,
+                Err(_) => {
+                    return Err(anyhow!(
+                        "Archive is in an invalid format, neither current nor past archive formats parse."
+                    ));
+                }
+            };
+
+            let combined_list = fallback_res
+                .0
+                .into_values()
+                .reduce(|acc, el| acc.into_iter().chain(el).collect())
+                .unwrap();
+
+            Ok(Archive(combined_list))
+        }
+    };
+    res
 }
 
 fn default_collection_path() -> Result<PathBuf> {
