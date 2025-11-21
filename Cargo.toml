@@ -6,10 +6,11 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.41", features = ["derive"] }
+crossterm = "0.29.0"
 itertools = "0.14.0"
 pretty_assertions = "1.4.1"
+ratatui = "0.29.0"
 reqwest = { version = "0.12.22", features = ["blocking", "json"] }
 rustyline = "17.0.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["preserve_order"] }
-skim = "0.20.5"

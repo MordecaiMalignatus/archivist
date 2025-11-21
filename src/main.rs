@@ -1,17 +1,13 @@
 use anyhow::Result;
 use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
-use itertools::Itertools;
 use reqwest::{blocking, header};
 use rustyline::DefaultEditor;
-use skim::Skim;
-use skim::prelude::*;
 use types::OldArchive;
 use types::State;
 
 use std::env;
 use std::fs;
-use std::io::Cursor;
 use std::path::PathBuf;
 
 mod input_parser;
@@ -34,7 +30,7 @@ fn main() -> Result<()> {
             set_code,
         }) => command_add(output_file, set_code)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
-        Some(Commands::Search { path }) => command_search(path)?,
+//        Some(Commands::Search { path }) => command_search(path)?,
         Some(Commands::Create { name, set_used }) => command_list_create(name, set_used)?,
         Some(Commands::List { subcommand }) => match subcommand {
             ListCommands::Create { name, set_used } => command_list_create(name, set_used)?,
@@ -230,35 +226,6 @@ fn command_add(output: Option<PathBuf>, set_code: Option<String>) -> Result<()> 
         println!("{modification_text}")
     }
     Ok(())
-}
-
-fn command_search(path: Option<PathBuf>) -> Result<()> {
-    let Archive(a) = read_collection(path)?;
-    let input = a.into_iter().map(|card| card_to_preview(&card)).join("\n");
-
-    let options = SkimOptionsBuilder::default()
-        .height(String::from("50%"))
-        .build()
-        .unwrap();
-
-    let item_reader = SkimItemReader::default();
-    let items = item_reader.of_bufread(Cursor::new(input));
-    let selected_item = Skim::run_with(&options, Some(items))
-        .map(|out| out.selected_items)
-        .unwrap();
-
-    println!("{}", selected_item.first().unwrap().output());
-
-    Ok(())
-}
-
-fn card_to_preview(c: &Card) -> String {
-    format!(
-        "{count}x {name} ({set})",
-        count = c.count,
-        name = c.name,
-        set = c.set.to_uppercase()
-    )
 }
 
 /// Export converts the current collection to the common format that is accepted
