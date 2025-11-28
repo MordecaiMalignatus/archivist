@@ -30,11 +30,11 @@ fn main() -> Result<()> {
             set_code,
         }) => command_add(output_file, set_code)?,
         Some(Commands::CollectionPath) => println!("{}", archive_collection_path().display()),
-//        Some(Commands::Search { path }) => command_search(path)?,
+        //        Some(Commands::Search { path }) => command_search(path)?,
         Some(Commands::Create { name, set_used }) => command_list_create(name, set_used)?,
         Some(Commands::List { subcommand }) => match subcommand {
             ListCommands::Create { name, set_used } => command_list_create(name, set_used)?,
-            ListCommands::Use { path, unset } => command_list_use(path, unset)?,
+            ListCommands::Use { path } => command_list_use(path)?,
         },
         _ => {}
     }
@@ -119,8 +119,6 @@ enum ListCommands {
     Use {
         #[arg(value_name = "DECK_NAME")]
         path: Option<String>,
-        #[arg(long)]
-        unset: Option<bool>,
     },
     // /// Delete a decklist. Opens a selector if not given a path.
     // Delete {
@@ -306,7 +304,7 @@ fn command_list_create(name: String, _set_used: bool) -> Result<()> {
     Ok(())
 }
 
-fn command_list_use(name: Option<String>, unset: Option<bool>) -> Result<()> {
+fn command_list_use(name: Option<String>) -> Result<()> {
     let mut state = read_state()?;
 
     match name {
@@ -319,15 +317,10 @@ fn command_list_use(name: Option<String>, unset: Option<bool>) -> Result<()> {
                 None => println!("Changed used deck from the collection to {specified_name}"),
             }
         }
-        None => match unset {
-            Some(_unset_value) => {
-                todo!();
-            }
-            None => {
-                state.currently_used_deck = None;
-                println!("Unset current deck, defaulting back to the collection.");
-            }
-        },
+        None => {
+            state.currently_used_deck = None;
+            println!("Unset current deck, defaulting back to the collection.");
+        }
     }
 
     // if absolute path, use that
