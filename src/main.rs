@@ -361,13 +361,8 @@ fn edit_archive(c: Card, path: Option<PathBuf>, removal: bool) -> Result<u32> {
             c.count
         }
     };
-
     let file_content = serde_json::to_string_pretty(&a)?;
-    let _ = match path {
-        Some(p) => std::fs::write(p, file_content),
-        None => std::fs::write(archive_collection_path(), file_content),
-    };
-
+    write_collection(file_content, path)?;
     Ok(count)
 }
 
@@ -400,7 +395,6 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
                     ));
                 }
             };
-
             let combined_list = fallback_res
                 .0
                 .into_values()
@@ -411,6 +405,16 @@ fn read_collection(explicit_path: Option<PathBuf>) -> Result<Archive> {
         }
     };
     res
+}
+
+fn write_collection(content: String, explicit_path: Option<PathBuf>) -> Result<()> {
+    let path = match explicit_path {
+        Some(path) => path,
+        None => default_collection_path()?,
+    };
+
+    std::fs::write(path, content)?;
+    Ok(())
 }
 
 fn default_collection_path() -> Result<PathBuf> {
